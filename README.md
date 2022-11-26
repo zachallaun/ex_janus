@@ -30,7 +30,7 @@ Here's what a basic policy module might look like:
 
 ```elixir
 defmodule Discoarse.Policy do
-  use Janus.Policy
+  use Janus
 
   alias Discoarse.Accounts
   alias Discoarse.Forum
@@ -74,16 +74,19 @@ defmodule Discoarse.Policy do
     |> allow(:create, Forum.Post)
     |> allow(:edit, Forum.Post, where: [author: [id: user.id]])
     # Users can archive posts they can edit unless its the first post in a thread
-    |> allow(:archive, Forum.Post, where: allows(:edit), where_not: [index: 0])
+    |> allow(:archive, Forum.Post, where: allows(:edit))
+    |> forbid(:archive, Forum.Post, where: [index: 0])
   end
 
   defp with_moderator_permissions(policy, mod) do
     policy
-    # Moderators can read, edit, and archive threads and posts...
+    # Moderators can read, edit, and archive threads and posts
     |> allow([:read, :edit, :archive], Forum.Thread)
-    |> allow([:read, :edit], Forum.Post)
-    # ...except for archiving the first post in a thread (archive the thread instead)
-    |> allow(:archive, Forum.Post, where_not: [index: 0])
+    # Note that moderators will not be able to archive the first post in a thread due to
+    # the `forbid` rule in user permissions
+    |> allow([:read, :edit, :archive], Forum.Post)
+    # This could be overridden using `always_allow/3` instead:
+    # |> always_allow(:archive, Forum.Post)
   end
 end
 ```
@@ -103,7 +106,7 @@ If better encapsulation is desired, policies could be defined per-context and co
 
 ```elixir
 defmodule Discoarse.Policy do
-  use Janus.Policy
+  use Janus
 
   @impl true
   def policy_for(policy \\ %Janus.Policy{}, actor) do
@@ -121,7 +124,7 @@ Now that we've defined a policy, we can use it for two main functions:
 1. authorization checks (can the actor do _this_ to _thing_), and
 2. data loading (fetch all the _things_ that the actor can do _this_ to).
 
-Auth/permissions checks are done with `c:Janus.Policy.allows?/3` and `c:Janus.Policy.disallows?/3`.
+Auth/permissions checks are done with `c:Janus.Policy.allows?/3` and `c:Janus.Policy.forbids?/3`.
 Data loading is done with `c:Janus.Policy.accessible/3`, which returns a composable `Ecto.Query`.
 
 ```elixir
