@@ -73,6 +73,26 @@ defmodule Janus do
 
   defp condition_match?([], _policy, _action, _object), do: true
 
+  defp condition_match?(condition, policy, action, object) when is_list(condition) do
+    Enum.all?(condition, &condition_match?(&1, policy, action, object))
+  end
+
+  defp condition_match?({:where, clause}, policy, action, object) do
+    clause_match?(clause, policy, action, object)
+  end
+
+  defp condition_match?({:where_not, clause}, policy, action, object) do
+    !clause_match?(clause, policy, action, object)
+  end
+
+  defp clause_match?(list, policy, action, object) when is_list(list) do
+    Enum.all?(list, &clause_match?(&1, policy, action, object))
+  end
+
+  defp clause_match?({attr, value}, _policy, _action, object) do
+    Map.get(object, attr) == value
+  end
+
   @as_ref :__object__
 
   @doc """
@@ -111,5 +131,44 @@ defmodule Janus do
 
   defp apply_condition(query, [], _schema, _action, _policy) do
     {query, true}
+  end
+
+  defp apply_condition(query, [{:where, clause} | rest], schema, action, policy) do
+    {query, where_clause, rest_where} =
+      apply_clause_and_rest(query, clause, rest, schema, action, policy)
+
+    {query, dynamic(^where_clause and ^rest_where)}
+  end
+
+  defp apply_condition(query, [{:where_not, clause} | rest], schema, action, policy) do
+    {query, where_clause, rest_where} =
+      apply_clause_and_rest(query, clause, rest, schema, action, policy)
+
+    {query, dynamic(not (^where_clause) and ^rest_where)}
+  end
+
+  defp apply_clause_and_rest(query, clause, rest_conditions, schema, action, policy) do
+    {query, where_clause} = apply_clause(query, clause, schema, action, policy)
+    {query, rest_where} = apply_condition(query, rest_conditions, schema, action, policy)
+
+    {query, where_clause, rest_where}
+  end
+
+  defp apply_clause(query, [clause | rest], schema, action, policy) do
+    {query, where_clause} = apply_clause(query, clause, schema, action, policy)
+
+    case apply_clause(query, rest, schema, action, policy) do
+      {query, rest_where} ->
+        {query, dynamic(^where_clause and ^rest_where)}
+
+      nil ->
+        {query, where_clause}
+    end
+  end
+
+  defp apply_clause(_query, [], _schema, _action, _policy), do: nil
+
+  defp apply_clause(query, {attr, value}, _schema, _action, _policy) do
+    {query, dynamic(field(as(^@as_ref), ^attr) == ^value)}
   end
 end
