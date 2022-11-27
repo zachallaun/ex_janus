@@ -5,7 +5,7 @@ defmodule Janus do
              |> String.split("<!-- MDOC -->")
              |> Enum.fetch!(1)
 
-  import Ecto.Query, only: [from: 2]
+  import Ecto.Query, only: [from: 2, dynamic: 1, dynamic: 2], warn: false
 
   @type action :: atom()
   @type schema :: atom()
@@ -82,6 +82,34 @@ defmodule Janus do
   def filter(schema, action, policy) when is_atom(schema) do
     rule = Janus.Policy.rule_for(policy, action, schema)
 
-    from(rule.schema, as: ^@as_ref)
+    {query, where} =
+      {from(rule.schema, as: ^@as_ref), false}
+      |> or_where(rule.allow, schema, action, policy)
+      |> and_where_not(rule.forbid, schema, action, policy)
+      |> or_where(rule.always_allow, schema, action, policy)
+
+    from(query, where: ^where)
+  end
+
+  defp or_where({query, where}, [condition | rest], schema, action, policy) do
+    {query, where_condition} = apply_condition(query, condition, schema, action, policy)
+
+    {query, dynamic(^where or ^where_condition)}
+    |> or_where(rest, schema, action, policy)
+  end
+
+  defp or_where(acc, [], _schema, _action, _policy), do: acc
+
+  defp and_where_not({query, where}, [condition | rest], schema, action, policy) do
+    {query, where_condition} = apply_condition(query, condition, schema, action, policy)
+
+    {query, dynamic(^where and not (^where_condition))}
+    |> and_where_not(rest, schema, action, policy)
+  end
+
+  defp and_where_not(acc, [], _schema, _action, _policy), do: acc
+
+  defp apply_condition(query, [], _schema, _action, _policy) do
+    {query, true}
   end
 end

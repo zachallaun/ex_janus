@@ -1,5 +1,7 @@
 defmodule JanusTest do
   use Janus.DataCase
+
+  import Janus.Policy
   import JanusTest.Fixtures
 
   alias JanusTest.Schemas.{Thread, Post, User}, warn: false
@@ -38,8 +40,6 @@ defmodule JanusTest do
   end
 
   describe "blanket permissions" do
-    import Janus.Policy
-
     test "should allow specified actions and forbid all others" do
       policy =
         %Janus.Policy{}
@@ -53,9 +53,10 @@ defmodule JanusTest do
       assert Janus.allows?(policy, :read, post)
       assert Janus.forbids?(policy, :other, thread)
       assert Janus.forbids?(policy, :read, thread.creator)
+      assert [%Post{}] = Janus.filter(Post, :read, policy) |> Repo.all()
     end
 
-    test "should be overriden by forbids" do
+    test "should override allow with forbid" do
       policy =
         %Janus.Policy{}
         |> allow(:read, Thread)
@@ -64,9 +65,10 @@ defmodule JanusTest do
       thread = thread_fixture()
 
       assert Janus.forbids?(policy, :read, thread)
+      assert [] = Janus.filter(Post, :read, policy) |> Repo.all()
     end
 
-    test "should override forbids with always_allow" do
+    test "should override forbid with always_allow" do
       policy =
         %Janus.Policy{}
         |> allow(:read, Thread)
@@ -76,6 +78,7 @@ defmodule JanusTest do
       thread = thread_fixture()
 
       assert Janus.allows?(policy, :read, thread)
+      assert [%Thread{}] = Janus.filter(Thread, :read, policy) |> Repo.all()
     end
   end
 end
