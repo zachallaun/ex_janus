@@ -3,8 +3,8 @@ defmodule JanusTest.Schemas.User do
   import Ecto.Changeset
 
   schema "users" do
-    field :roles, :map, default: %{}
     field :name, :string
+    field :roles, :map, default: %{}
   end
 
   def changeset(user, attrs) do
