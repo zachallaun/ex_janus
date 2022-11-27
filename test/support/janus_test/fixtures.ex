@@ -21,7 +21,7 @@ defmodule JanusTest.Fixtures do
         content \\ rand_content()
       ) do
     {:ok, post} = Forum.create_post(author, thread, content)
-    post
+    JanusTest.Repo.preload(post, [:thread, :author])
   end
 
   defp rand_string, do: Ecto.UUID.generate()

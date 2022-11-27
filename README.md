@@ -125,7 +125,7 @@ Now that we've defined a policy, we can use it for two main functions:
 2. data loading (fetch all the _things_ that the actor can do _this_ to).
 
 Auth/permissions checks are done with `c:Janus.Policy.allows?/3` and `c:Janus.Policy.forbids?/3`.
-Data loading is done with `c:Janus.Policy.accessible/3`, which returns a composable `Ecto.Query`.
+Data loading is done with `c:Janus.Policy.filter/3`, which returns a composable `Ecto.Query`.
 
 ```elixir
 import Ecto.Query
@@ -139,7 +139,7 @@ Policy.allows?(nil, :edit, some_thread) #=> false, guests can't edit any threads
 
 # Data loading
 Forum.Thread
-|> Policy.accessible(:edit, user)
+|> Policy.filter(:edit, user)
 |> order_by(desc: :inserted_at)
 |> Repo.all()
 ```

@@ -1,18 +1,37 @@
 defmodule Janus.Policy.Rule do
   @moduledoc """
-  Struct defining an authorization rule.
-
-  See `Janus.Policy` for documentation on how to create and compose rules.
+  Struct containing the authorization data for a struct and action.
   """
 
-  @type options :: keyword()
-
   @type t :: %__MODULE__{
-          where: nil | [],
-          where_not: nil | []
+          schema: Janus.schema(),
+          action: Janus.action(),
+          allow: [keyword()],
+          forbid: [keyword()],
+          always_allow: [keyword()]
         }
 
-  defstruct where: nil, where_not: nil
+  defstruct [
+    :schema,
+    :action,
+    allow: [],
+    forbid: [],
+    always_allow: []
+  ]
+
+  @doc false
+  def new(schema, action) do
+    %__MODULE__{schema: schema, action: action}
+  end
+
+  @doc false
+  def allow(rule, opts), do: update_in(rule.allow, &[opts | &1])
+
+  @doc false
+  def forbid(rule, opts), do: update_in(rule.forbid, &[opts | &1])
+
+  @doc false
+  def always_allow(rule, opts), do: update_in(rule.always_allow, &[opts | &1])
 end
 
 defmodule Janus.Policy do
@@ -31,40 +50,57 @@ defmodule Janus.Policy do
   1. Filter resources to those matched by any `allow` rule.
   2. Take the difference of 1. and resources matched by any `forbid` rule.
   3. Take the union of 2. and resources matched by any `always_allow` rule.
-  4. Take the difference of 3. and resources matched by any `always_forbid` rule.
   """
 
-  alias Janus.Policy.Rule
+  alias __MODULE__
+  alias __MODULE__.Rule
 
-  @type ruleset ::
-          {
-            allow :: [Rule.t()],
-            forbid :: [Rule.t()],
-            always_allow :: [Rule.t()],
-            always_forbid :: [Rule.t()]
+  @type t :: %Policy{
+          rules: %{
+            {Janus.schema(), Janus.action()} => Rule.t()
           }
-
-  @type t :: %__MODULE__{
-          subjects: %{Janus.subject() => [{Janus.action(), ruleset}, ...]}
         }
 
-  defstruct subjects: %{}
+  defstruct rules: %{}
 
   @callback policy_for(t, actor :: any()) :: t
 
-  @spec allow(t, Janus.action(), Rule.options()) :: t
-  def allow(policy, actor, opts) do
+  @doc "TODO"
+  @spec allow(t, Janus.action(), Janus.schema(), keyword()) :: t
+  def allow(%Policy{} = policy, action, schema, opts \\ []) do
+    policy
+    |> rule_for(action, schema)
+    |> Rule.allow(opts)
+    |> put_rule(policy)
   end
 
-  @spec forbid(t, Janus.action(), Rule.options()) :: t
-  def forbid(policy, actor, opts) do
+  @doc "TODO"
+  @spec forbid(t, Janus.action(), Janus.schema(), keyword()) :: t
+  def forbid(%Policy{} = policy, action, schema, opts \\ []) do
+    policy
+    |> rule_for(action, schema)
+    |> Rule.forbid(opts)
+    |> put_rule(policy)
   end
 
-  @spec always_allow(t, Janus.action(), Rule.options()) :: t
-  def always_allow(policy, actor, opts) do
+  @doc "TODO"
+  @spec always_allow(t, Janus.action(), Janus.schema(), keyword()) :: t
+  def always_allow(%Policy{} = policy, action, schema, opts \\ []) do
+    policy
+    |> rule_for(action, schema)
+    |> Rule.always_allow(opts)
+    |> put_rule(policy)
   end
 
-  @spec always_forbid(t, Janus.action(), Rule.options()) :: t
-  def always_forbid(policy, actor, opts) do
+  @doc false
+  @spec rule_for(t, Janus.action(), Janus.schema()) :: Rule.t()
+  def rule_for(%Policy{rules: rules}, action, schema) do
+    Map.get_lazy(rules, {schema, action}, fn ->
+      Rule.new(schema, action)
+    end)
+  end
+
+  defp put_rule(%Rule{schema: schema, action: action} = rule, policy) do
+    update_in(policy.rules, &Map.put(&1, {schema, action}, rule))
   end
 end
