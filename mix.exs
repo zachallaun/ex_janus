@@ -31,7 +31,7 @@ defmodule Janus.MixProject do
   defp deps do
     [
       {:ecto, "~> 3.8"},
-      {:ecto_sql, "~> 3.6", only: :test},
+      {:ecto_sql, "~> 3.6", only: [:test, :dev]},
       {:postgrex, "~> 0.16", only: :test},
       {:jason, "~> 1.4", only: :test}
     ]
@@ -42,7 +42,10 @@ defmodule Janus.MixProject do
 
   defp aliases do
     [
-      "ecto.setup": ["ecto.create", "ecto.migrate --migrations-path test/support/janus_test/migrations"]
+      "ecto.setup": [
+        "ecto.create",
+        "ecto.migrate --migrations-path test/support/janus_test/migrations"
+      ]
     ]
   end
 end
