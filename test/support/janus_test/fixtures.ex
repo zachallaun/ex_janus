@@ -1,5 +1,5 @@
 defmodule JanusTest.Fixtures do
-  alias JanusTest.Forum
+  alias JanusTest.{Forum, Repo}
 
   def user_fixture(attrs \\ %{}) do
     {:ok, user} =
@@ -12,7 +12,7 @@ defmodule JanusTest.Fixtures do
 
   def thread_fixture(creator \\ user_fixture(), title \\ rand_title(), content \\ rand_content()) do
     {:ok, thread} = Forum.create_thread(creator, title, content)
-    thread
+    Repo.preload(thread, :creator)
   end
 
   def post_fixture(
@@ -21,7 +21,7 @@ defmodule JanusTest.Fixtures do
         content \\ rand_content()
       ) do
     {:ok, post} = Forum.create_post(author, thread, content)
-    JanusTest.Repo.preload(post, [:thread, :author])
+    Repo.preload(post, [:thread, :author])
   end
 
   defp rand_string, do: Ecto.UUID.generate()
