@@ -137,4 +137,25 @@ defmodule JanusTest do
       assert [%Thread{id: ^readable_id}] = Janus.filter(Thread, :read, policy) |> Repo.all()
     end
   end
+
+  describe "derived permissions" do
+    test "should allow actions based on other permissions" do
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Thread, where: [archived: false])
+        |> allow(:edit, Thread, where: allows(:read))
+
+      thread = thread_fixture()
+
+      assert Janus.allows?(policy, :read, thread)
+      assert Janus.allows?(policy, :edit, thread)
+      assert [%Thread{}] = Janus.filter(Thread, :edit, policy) |> Repo.all()
+
+      thread = thread |> Thread.changeset(%{archived: true}) |> Repo.update!()
+
+      assert Janus.forbids?(policy, :read, thread)
+      assert Janus.forbids?(policy, :edit, thread)
+      assert [] = Janus.filter(Thread, :edit, policy) |> Repo.all()
+    end
+  end
 end

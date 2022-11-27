@@ -89,6 +89,10 @@ defmodule Janus do
     Enum.all?(list, &clause_match?(&1, policy, action, object))
   end
 
+  defp clause_match?({:__janus_derived__, action}, policy, _action, object) do
+    allows?(policy, action, object)
+  end
+
   defp clause_match?({attr, value}, _policy, _action, object) do
     Map.get(object, attr) == value
   end
@@ -114,7 +118,7 @@ defmodule Janus do
   defp or_where({query, where}, [condition | rest], schema, action, policy) do
     {query, where_condition} = apply_condition(query, condition, schema, action, policy)
 
-    {query, dynamic(^where or ^where_condition)}
+    {query, simplify_or(where, where_condition)}
     |> or_where(rest, schema, action, policy)
   end
 
@@ -123,7 +127,7 @@ defmodule Janus do
   defp and_where_not({query, where}, [condition | rest], schema, action, policy) do
     {query, where_condition} = apply_condition(query, condition, schema, action, policy)
 
-    {query, dynamic(^where and not (^where_condition))}
+    {query, simplify_and(where, dynamic(not ^where_condition))}
     |> and_where_not(rest, schema, action, policy)
   end
 
@@ -137,14 +141,14 @@ defmodule Janus do
     {query, where_clause, rest_where} =
       apply_clause_and_rest(query, clause, rest, schema, action, policy)
 
-    {query, dynamic(^where_clause and ^rest_where)}
+    {query, simplify_and(where_clause, rest_where)}
   end
 
   defp apply_condition(query, [{:where_not, clause} | rest], schema, action, policy) do
     {query, where_clause, rest_where} =
       apply_clause_and_rest(query, clause, rest, schema, action, policy)
 
-    {query, dynamic(not (^where_clause) and ^rest_where)}
+    {query, simplify_and(dynamic(not (^where_clause)), rest_where)}
   end
 
   defp apply_clause_and_rest(query, clause, rest_conditions, schema, action, policy) do
@@ -156,19 +160,41 @@ defmodule Janus do
 
   defp apply_clause(query, [clause | rest], schema, action, policy) do
     {query, where_clause} = apply_clause(query, clause, schema, action, policy)
+    {query, rest_clause} = apply_clause(query, rest, schema, action, policy)
 
-    case apply_clause(query, rest, schema, action, policy) do
-      {query, rest_where} ->
-        {query, dynamic(^where_clause and ^rest_where)}
-
-      nil ->
-        {query, where_clause}
-    end
+    {query, simplify_and(where_clause, rest_clause)}
   end
 
-  defp apply_clause(_query, [], _schema, _action, _policy), do: nil
+  defp apply_clause(query, [], _schema, _action, _policy), do: {query, nil}
+
+  defp apply_clause(query, {:__janus_derived__, action}, schema, _action, policy) do
+    subquery = filter(schema, action, policy)
+
+    query =
+      from(query, join: sub in subquery(subquery), on: as(^@as_ref).id == sub.id)
+
+    {query, nil}
+  end
 
   defp apply_clause(query, {attr, value}, _schema, _action, _policy) do
     {query, dynamic(field(as(^@as_ref), ^attr) == ^value)}
   end
+
+  defp simplify_and(false, _), do: false
+  defp simplify_and(_, false), do: false
+  defp simplify_and(nil, nil), do: true
+  defp simplify_and(nil, clause), do: clause
+  defp simplify_and(true, clause), do: clause
+  defp simplify_and(clause, nil), do: clause
+  defp simplify_and(clause, true), do: clause
+  defp simplify_and(clause1, clause2), do: dynamic(^clause1 and ^clause2)
+
+  defp simplify_or(true, _), do: true
+  defp simplify_or(_, true), do: true
+  defp simplify_or(nil, nil), do: false
+  defp simplify_or(nil, clause), do: clause
+  defp simplify_or(false, clause), do: clause
+  defp simplify_or(clause, nil), do: clause
+  defp simplify_or(clause, false), do: clause
+  defp simplify_or(clause1, clause2), do: dynamic(^clause1 or ^clause2)
 end

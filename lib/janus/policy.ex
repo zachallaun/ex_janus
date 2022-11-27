@@ -92,6 +92,10 @@ defmodule Janus.Policy do
     |> put_rule(policy)
   end
 
+  @doc "TODO (derived permissions)"
+  @spec allows(Janus.action()) :: tuple()
+  def allows(action), do: {:__janus_derived__, action}
+
   @doc false
   @spec rule_for(t, Janus.action(), Janus.schema()) :: Rule.t()
   def rule_for(%Policy{rules: rules}, action, schema) do
