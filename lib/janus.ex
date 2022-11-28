@@ -123,101 +123,24 @@ defmodule Janus do
   def filter(schema, action, policy) when is_atom(schema) do
     rule = Janus.Policy.rule_for(policy, action, schema)
 
-    {query, where} =
-      {from(rule.schema, as: ^@root_binding), false}
-      |> or_where(rule.allow, schema, policy)
-      |> and_where_not(rule.forbid, schema, policy)
-      |> or_where(rule.always_allow, schema, policy)
-
-    from(query, where: ^where)
+    Janus.Filter.new(policy, schema, @root_binding, false)
+    |> or_where(rule.allow)
+    |> and_where_not(rule.forbid)
+    |> or_where(rule.always_allow)
+    |> Ecto.Queryable.to_query()
   end
 
-  defp or_where({query, where}, [condition | rest], schema, policy) do
-    {query, where_condition} = apply_condition(query, condition, schema, policy)
+  defp or_where(filter, []), do: filter
 
-    {query, simplify_or(where, where_condition)}
-    |> or_where(rest, schema, policy)
+  defp or_where(filter, conditions) do
+    f = Janus.Filter.with_conditions(filter, conditions)
+    Janus.Filter.combine(filter, :or, f)
   end
 
-  defp or_where(acc, [], _schema, _policy), do: acc
+  defp and_where_not(filter, []), do: filter
 
-  defp and_where_not({query, where}, [condition | rest], schema, policy) do
-    {query, where_condition} = apply_condition(query, condition, schema, policy)
-
-    {query, simplify_and(where, dynamic(not (^where_condition)))}
-    |> and_where_not(rest, schema, policy)
+  defp and_where_not(filter, conditions) do
+    f = Janus.Filter.with_conditions(filter, conditions)
+    Janus.Filter.combine(filter, :and_not, f)
   end
-
-  defp and_where_not(acc, [], _schema, _policy), do: acc
-
-  defp apply_condition(query, [], _schema, _policy) do
-    {query, true}
-  end
-
-  defp apply_condition(query, [{:where, clause} | rest], schema, policy) do
-    {query, where_clause, rest_where} = apply_clause_and_rest(query, clause, rest, schema, policy)
-
-    {query, simplify_and(where_clause, rest_where)}
-  end
-
-  defp apply_condition(query, [{:where_not, clause} | rest], schema, policy) do
-    {query, where_clause, rest_where} = apply_clause_and_rest(query, clause, rest, schema, policy)
-
-    {query, simplify_and(dynamic(not (^where_clause)), rest_where)}
-  end
-
-  defp apply_clause_and_rest(query, clause, rest_conditions, schema, policy) do
-    {query, where_clause} = apply_clause(query, clause, schema, policy, @root_binding)
-    {query, rest_where} = apply_condition(query, rest_conditions, schema, policy)
-
-    {query, where_clause, rest_where}
-  end
-
-  defp apply_clause(query, [clause | rest], schema, policy, binding) do
-    {query, where_clause} = apply_clause(query, clause, schema, policy, binding)
-    {query, rest_clause} = apply_clause(query, rest, schema, policy, binding)
-
-    {query, simplify_and(where_clause, rest_clause)}
-  end
-
-  defp apply_clause(query, [], _schema, _policy, _binding), do: {query, nil}
-
-  defp apply_clause(query, {:__janus_derived__, action}, schema, policy, binding) do
-    subquery = filter(schema, action, policy)
-
-    query = from(query, join: sub in subquery(subquery), on: as(^binding).id == sub.id)
-
-    {query, nil}
-  end
-
-  defp apply_clause(query, {field, value}, schema, policy, binding) do
-    if field in schema.__schema__(:associations) do
-      related = schema.__schema__(:association, field).related
-
-      query =
-        Ecto.Query.with_named_binding(query, field, fn query, _ ->
-          from([{^binding, x}] in query, join: y in assoc(x, ^field), as: ^field)
-        end)
-
-      apply_clause(query, value, related, policy, field)
-    else
-      {query, dynamic(field(as(^binding), ^field) == ^value)}
-    end
-  end
-
-  defp simplify_and(false, _), do: false
-  defp simplify_and(_, false), do: false
-  defp simplify_and(nil, clause), do: clause
-  defp simplify_and(true, clause), do: clause
-  defp simplify_and(clause, nil), do: clause
-  defp simplify_and(clause, true), do: clause
-  defp simplify_and(clause1, clause2), do: dynamic(^clause1 and ^clause2)
-
-  defp simplify_or(true, _), do: true
-  defp simplify_or(_, true), do: true
-  defp simplify_or(nil, clause), do: clause
-  defp simplify_or(false, clause), do: clause
-  defp simplify_or(clause, nil), do: clause
-  defp simplify_or(clause, false), do: clause
-  defp simplify_or(clause1, clause2), do: dynamic(^clause1 or ^clause2)
 end
