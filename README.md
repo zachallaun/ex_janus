@@ -129,8 +129,9 @@ Now that we've defined a policy, we can use it for two main functions:
 1. authorization checks (can the actor do _this_ to _thing_), and
 2. data loading (fetch all the _things_ that the actor can do _this_ to).
 
-Auth/permissions checks are done with `c:Janus.Policy.allows?/3` and `c:Janus.Policy.forbids?/3`.
-Data loading is done with `c:Janus.Policy.filter/3`, which returns a composable `Ecto.Query`.
+Auth/permissions checks are done with `Janus.allows?/3` and `Janus.forbids?/3`.
+Data loading is done with `Janus.filter/3`, which returns a composable `Ecto.Query`.
+(Note that `use Janus` defined these functions on our policy module as well.)
 
 ```elixir
 import Ecto.Query

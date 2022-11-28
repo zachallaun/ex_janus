@@ -21,7 +21,7 @@ defmodule Janus do
 
       @doc "See `Janus.allows?/3`"
       def allows?(actor, action, object) do
-        Janus.allows?(policy_for(actor), action, object)
+        Janus.allows?(__policy_for__(actor), action, object)
       end
 
       @doc "See `Janus.forbids?/3`"
@@ -31,10 +31,13 @@ defmodule Janus do
 
       @doc "See `Janus.filter/3`"
       def filter(query, action, actor) do
-        Janus.filter(query, action, policy_for(actor))
+        Janus.filter(query, action, __policy_for__(actor))
       end
 
       defoverridable allows?: 3, forbids?: 3, filter: 3
+
+      defp __policy_for__(%Janus.Policy{} = policy), do: policy
+      defp __policy_for__(actor), do: policy_for(actor)
     end
   end
 
