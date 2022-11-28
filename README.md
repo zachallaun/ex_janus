@@ -2,7 +2,13 @@
 
 <!-- MDOC -->
 
-Flexible and composable authorization for resources defined by `Ecto` schemas.
+Flexible and composable authorization for resources backed by `Ecto` schemas.
+
+This library hopes to provide a small, flexible, and relatively low-level API for handling authorization with minimal magic.
+Janus tries to make as few decisions for you as possible, concentrating on answering these two questions:
+
+1. Can this _actor_ perform this _action_ on this _resource_?
+2. What are all of the _resources_ that this _actor_ can perform this _action_ on?
 
 ## Example: Forum
 
@@ -12,7 +18,6 @@ For our purposes, our forum will have a very limited set of resources that we wi
 
 - Threads
 - Posts
-- Profiles
 
 We will also have 3 types of "actors" to be considered when defining authorization rules:
 
@@ -118,8 +123,6 @@ defmodule Discoarse.Policy do
   end
 end
 ```
-
-### Usage
 
 Now that we've defined a policy, we can use it for two main functions:
 
