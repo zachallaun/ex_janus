@@ -37,6 +37,18 @@ defmodule JanusTest do
       assert %Ecto.Query{} = query
       assert [_, _, _] = Repo.all(query)
     end
+
+    test "defines filter/4" do
+      require Ecto.Query
+      _ = [thread_fixture(), thread_fixture(), thread_fixture()]
+
+      query =
+        Thread
+        |> Ecto.Query.limit(1)
+        |> ExamplePolicy.filter(Thread, :read, :user)
+
+      assert [_] = Repo.all(query)
+    end
   end
 
   describe "blanket permissions" do

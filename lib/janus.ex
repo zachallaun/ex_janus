@@ -29,9 +29,14 @@ defmodule Janus do
         !allows?(actor, action, object)
       end
 
-      @doc "See `Janus.filter/3`"
-      def filter(query, action, actor) do
-        Janus.filter(query, action, __policy_for__(actor))
+      @doc "See `Janus.filter/4`"
+      def filter(schema, action, actor) do
+        Janus.filter(schema, action, __policy_for__(actor))
+      end
+
+      @doc "See `Janus.filter/4`"
+      def filter(query, schema, action, actor) do
+        Janus.filter(query, schema, action, __policy_for__(action))
       end
 
       defoverridable allows?: 3, forbids?: 3, filter: 3
@@ -120,14 +125,18 @@ defmodule Janus do
   Returns an `Ecto.Query` that filters records from `schema` to those that can have
   `action` performed according to the `policy`.
   """
-  def filter(schema, action, policy) when is_atom(schema) do
+  def filter(query, schema, action, policy) do
     rule = Janus.Policy.rule_for(policy, action, schema)
 
     Janus.Filter.new(policy, schema, @root_binding, false)
     |> or_where(rule.allow)
     |> and_where_not(rule.forbid)
     |> or_where(rule.always_allow)
-    |> Ecto.Queryable.to_query()
+    |> Janus.Filter.to_query(query)
+  end
+
+  def filter(schema, action, policy) do
+    filter(schema, schema, action, policy)
   end
 
   defp or_where(filter, []), do: filter

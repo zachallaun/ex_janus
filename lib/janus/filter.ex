@@ -19,7 +19,7 @@ defmodule Janus.Filter do
   end
 
   @doc "Convert a `%Filter{}` to an `%Ecto.Query{}`."
-  def to_query(%Filter{} = filter) do
+  def to_query(%Filter{} = filter, query \\ nil) do
     %{
       schema: schema,
       binding: binding,
@@ -27,7 +27,8 @@ defmodule Janus.Filter do
       joins: joins
     } = filter
 
-    query = from(schema, as: ^binding, where: ^dynamic)
+    query = query || schema
+    query = from(query, as: ^binding, where: ^dynamic)
 
     for join <- joins, reduce: query do
       query ->
