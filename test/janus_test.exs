@@ -60,11 +60,13 @@ defmodule JanusTest do
         %Janus.Policy{}
         |> allow(:read, Thread)
 
-      query =
-        Ecto.Query.from(Thread, limit: 1)
-        |> Janus.filter(:read, policy)
+      query = Ecto.Query.from(Thread, limit: 1)
 
-      assert [_] = Repo.all(query)
+      assert [_] = query |> Janus.filter(:read, policy) |> Repo.all()
+
+      query = Ecto.Query.from(Ecto.Query.subquery(query))
+
+      assert [_] = query |> Janus.filter(:read, policy) |> Repo.all()
     end
   end
 

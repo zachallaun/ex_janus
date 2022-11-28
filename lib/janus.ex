@@ -135,18 +135,17 @@ defmodule Janus do
     |> Janus.Filter.to_query(query)
   end
 
-  def filter(%Ecto.Query{} = query, action, policy) do
-    case query.from do
-      %{source: {_, schema}} when not is_nil(schema) ->
-        filter(query, schema, action, policy)
-
-      _ ->
-        raise "filter/3 requires that query have a schema as its source"
-    end
+  def filter(query_or_schema, action, policy) do
+    filter(query_or_schema, derive_schema(query_or_schema), action, policy)
   end
 
-  def filter(schema, action, policy) when is_atom(schema) do
-    filter(schema, schema, action, policy)
+  defp derive_schema(%Ecto.Query{} = query), do: derive_schema(query.from.source)
+  defp derive_schema(%Ecto.SubQuery{query: query}), do: derive_schema(query)
+  defp derive_schema({_, schema}), do: derive_schema(schema)
+  defp derive_schema(schema) when is_atom(schema) and not is_nil(schema), do: schema
+
+  defp derive_schema(_) do
+    raise "filter/3 requires a schema or a query with a schema as its source"
   end
 
   defp or_where(filter, []), do: filter
