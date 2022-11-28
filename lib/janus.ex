@@ -125,7 +125,7 @@ defmodule Janus do
   Returns an `Ecto.Query` that filters records from `schema` to those that can have
   `action` performed according to the `policy`.
   """
-  def filter(query, schema, action, policy) do
+  def filter(query, schema, action, policy) when is_atom(schema) do
     rule = Janus.Policy.rule_for(policy, action, schema)
 
     Janus.Filter.new(policy, schema, @root_binding, false)
@@ -135,7 +135,17 @@ defmodule Janus do
     |> Janus.Filter.to_query(query)
   end
 
-  def filter(schema, action, policy) do
+  def filter(%Ecto.Query{} = query, action, policy) do
+    case query.from do
+      %{source: {_, schema}} when not is_nil(schema) ->
+        filter(query, schema, action, policy)
+
+      _ ->
+        raise "filter/3 requires that query have a schema as its source"
+    end
+  end
+
+  def filter(schema, action, policy) when is_atom(schema) do
     filter(schema, schema, action, policy)
   end
 

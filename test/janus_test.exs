@@ -1,6 +1,8 @@
 defmodule JanusTest do
   use Janus.DataCase
 
+  require Ecto.Query
+
   import Janus.Policy
   import JanusTest.Fixtures
 
@@ -39,13 +41,28 @@ defmodule JanusTest do
     end
 
     test "defines filter/4" do
-      require Ecto.Query
       _ = [thread_fixture(), thread_fixture(), thread_fixture()]
 
       query =
         Thread
         |> Ecto.Query.limit(1)
         |> ExamplePolicy.filter(Thread, :read, :user)
+
+      assert [_] = Repo.all(query)
+    end
+  end
+
+  describe "filter/4" do
+    test "should derive schema from query" do
+      _ = [thread_fixture(), thread_fixture(), thread_fixture()]
+
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Thread)
+
+      query =
+        Ecto.Query.from(Thread, limit: 1)
+        |> Janus.filter(:read, policy)
 
       assert [_] = Repo.all(query)
     end
