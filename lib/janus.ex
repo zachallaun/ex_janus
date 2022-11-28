@@ -93,11 +93,25 @@ defmodule Janus do
     allows?(policy, action, object)
   end
 
-  defp clause_match?({attr, value}, _policy, object) do
-    Map.get(object, attr) == value
+  defp clause_match?({field, value}, policy, %schema{} = object) do
+    if field in schema.__schema__(:associations) do
+      clause_match?(value, policy, fetch_associated!(object, field))
+    else
+      Map.get(object, field) == value
+    end
   end
 
-  @as_ref :__object__
+  defp fetch_associated!(object, field) do
+    case Map.fetch!(object, field) do
+      %Ecto.Association.NotLoaded{} ->
+        raise "field #{inspect(field)} must be pre-loaded on #{inspect(object)}"
+
+      value ->
+        value
+    end
+  end
+
+  @root_binding :__object__
 
   @doc """
   Returns an `Ecto.Query` that filters records from `schema` to those that can have
@@ -107,7 +121,7 @@ defmodule Janus do
     rule = Janus.Policy.rule_for(policy, action, schema)
 
     {query, where} =
-      {from(rule.schema, as: ^@as_ref), false}
+      {from(rule.schema, as: ^@root_binding), false}
       |> or_where(rule.allow, schema, policy)
       |> and_where_not(rule.forbid, schema, policy)
       |> or_where(rule.always_allow, schema, policy)
@@ -150,36 +164,46 @@ defmodule Janus do
   end
 
   defp apply_clause_and_rest(query, clause, rest_conditions, schema, policy) do
-    {query, where_clause} = apply_clause(query, clause, schema, policy)
+    {query, where_clause} = apply_clause(query, clause, schema, policy, @root_binding)
     {query, rest_where} = apply_condition(query, rest_conditions, schema, policy)
 
     {query, where_clause, rest_where}
   end
 
-  defp apply_clause(query, [clause | rest], schema, policy) do
-    {query, where_clause} = apply_clause(query, clause, schema, policy)
-    {query, rest_clause} = apply_clause(query, rest, schema, policy)
+  defp apply_clause(query, [clause | rest], schema, policy, binding) do
+    {query, where_clause} = apply_clause(query, clause, schema, policy, binding)
+    {query, rest_clause} = apply_clause(query, rest, schema, policy, binding)
 
     {query, simplify_and(where_clause, rest_clause)}
   end
 
-  defp apply_clause(query, [], _schema, _policy), do: {query, nil}
+  defp apply_clause(query, [], _schema, _policy, _binding), do: {query, nil}
 
-  defp apply_clause(query, {:__janus_derived__, action}, schema, policy) do
+  defp apply_clause(query, {:__janus_derived__, action}, schema, policy, binding) do
     subquery = filter(schema, action, policy)
 
-    query = from(query, join: sub in subquery(subquery), on: as(^@as_ref).id == sub.id)
+    query = from(query, join: sub in subquery(subquery), on: as(^binding).id == sub.id)
 
     {query, nil}
   end
 
-  defp apply_clause(query, {attr, value}, _schema, _policy) do
-    {query, dynamic(field(as(^@as_ref), ^attr) == ^value)}
+  defp apply_clause(query, {field, value}, schema, policy, binding) do
+    if field in schema.__schema__(:associations) do
+      related = schema.__schema__(:association, field).related
+
+      query =
+        Ecto.Query.with_named_binding(query, field, fn query, _ ->
+          from([{^binding, x}] in query, join: y in assoc(x, ^field), as: ^field)
+        end)
+
+      apply_clause(query, value, related, policy, field)
+    else
+      {query, dynamic(field(as(^binding), ^field) == ^value)}
+    end
   end
 
   defp simplify_and(false, _), do: false
   defp simplify_and(_, false), do: false
-  defp simplify_and(nil, nil), do: true
   defp simplify_and(nil, clause), do: clause
   defp simplify_and(true, clause), do: clause
   defp simplify_and(clause, nil), do: clause
@@ -188,7 +212,6 @@ defmodule Janus do
 
   defp simplify_or(true, _), do: true
   defp simplify_or(_, true), do: true
-  defp simplify_or(nil, nil), do: false
   defp simplify_or(nil, clause), do: clause
   defp simplify_or(false, clause), do: clause
   defp simplify_or(clause, nil), do: clause

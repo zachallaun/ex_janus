@@ -83,7 +83,7 @@ defmodule JanusTest do
   end
 
   describe "permissions based on attribute" do
-    test "should allow actions if :where attribute matches" do
+    test "should allow action if :where attribute matches" do
       policy =
         %Janus.Policy{}
         |> allow(:read, Thread, where: [archived: false])
@@ -97,7 +97,7 @@ defmodule JanusTest do
       assert thread.id == unarchived.id
     end
 
-    test "should allow actions if :where_not attribute doesn't match" do
+    test "should allow action if :where_not attribute doesn't match" do
       policy =
         %Janus.Policy{}
         |> allow(:read, Thread, where_not: [archived: true])
@@ -108,7 +108,7 @@ defmodule JanusTest do
       assert [%Thread{}] = Janus.filter(Thread, :read, policy) |> Repo.all()
     end
 
-    test "should allow actions if multiple :where attributes match" do
+    test "should allow action if multiple :where attributes match" do
       policy_for = fn user ->
         %Janus.Policy{}
         |> allow(:edit, Thread, where: [archived: false, creator_id: user.id])
@@ -138,8 +138,41 @@ defmodule JanusTest do
     end
   end
 
+  describe "permissions based on associations" do
+    test "should allow action if associated :where attribute matches" do
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Post, where: [thread: [archived: false]])
+
+      post = post_fixture()
+
+      assert Janus.allows?(policy, :read, post)
+      assert [_, _] = Janus.filter(Post, :read, policy) |> Repo.all()
+
+      _ = post.thread |> Thread.changeset(%{archived: true}) |> Repo.update!()
+      post = Repo.preload(post, :thread, force: true)
+
+      assert Janus.forbids?(policy, :read, post)
+      assert [] = Janus.filter(Post, :read, policy) |> Repo.all()
+    end
+
+    test "should allow action if nested association :where attribute matches" do
+      user = user_fixture()
+
+      policy =
+        %Janus.Policy{}
+        |> allow(:edit, Post, where: [thread: [creator: [id: user.id]]])
+
+      %{posts: [post]} = thread_fixture(user)
+      post = Repo.preload(post, thread: :creator)
+
+      assert Janus.allows?(policy, :edit, post)
+      assert [_] = Janus.filter(Post, :edit, policy) |> Repo.all()
+    end
+  end
+
   describe "derived permissions" do
-    test "should allow actions based on other permissions" do
+    test "should allow action based on other permissions" do
       policy =
         %Janus.Policy{}
         |> allow(:read, Thread, where: [archived: false])
@@ -156,6 +189,18 @@ defmodule JanusTest do
       assert Janus.forbids?(policy, :read, thread)
       assert Janus.forbids?(policy, :edit, thread)
       assert [] = Janus.filter(Thread, :edit, policy) |> Repo.all()
+    end
+
+    test "should allow action based on permission of an association" do
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Thread, where: [archived: false])
+        |> allow(:read, Post, where: [thread: allows(:read)])
+
+      post = post_fixture()
+
+      assert Janus.allows?(policy, :read, post)
+      assert [_, _] = Janus.filter(Post, :read, policy) |> Repo.all()
     end
   end
 end

@@ -1,3 +1,5 @@
+# Janus
+
 <!-- MDOC -->
 
 Flexible and composable authorization for resources defined by `Ecto` schemas.

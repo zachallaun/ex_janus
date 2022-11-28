@@ -30,8 +30,8 @@ defmodule Janus.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:ecto, "~> 3.8"},
-      {:ecto_sql, "~> 3.6", only: [:test, :dev]},
+      {:ecto, "~> 3.9"},
+      {:ecto_sql, "~> 3.9", only: [:test, :dev]},
       {:postgrex, "~> 0.16", only: :test},
       {:jason, "~> 1.4", only: :test}
     ]
