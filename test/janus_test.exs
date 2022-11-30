@@ -3,6 +3,7 @@ defmodule JanusTest do
 
   require Ecto.Query
 
+  require Janus
   import Janus.Policy
   import JanusTest.Fixtures
 
@@ -32,7 +33,8 @@ defmodule JanusTest do
       refute ExamplePolicy.forbids?(:user, :read, thread)
     end
 
-    test "defines filter/3" do
+    test "defines filter/3 accepting a first-argument schema" do
+      require ExamplePolicy
       _ = [thread_fixture(), thread_fixture(), thread_fixture()]
       query = ExamplePolicy.filter(Thread, :read, :user)
 
@@ -40,13 +42,14 @@ defmodule JanusTest do
       assert [_, _, _] = Repo.all(query)
     end
 
-    test "defines filter/4" do
+    test "defines filter/3 accepting a first-argument query" do
+      require ExamplePolicy
       _ = [thread_fixture(), thread_fixture(), thread_fixture()]
 
       query =
         Thread
         |> Ecto.Query.limit(1)
-        |> ExamplePolicy.filter(Thread, :read, :user)
+        |> ExamplePolicy.filter(:read, :user)
 
       assert [_] = Repo.all(query)
     end
@@ -113,7 +116,7 @@ defmodule JanusTest do
     end
   end
 
-  describe "permissions based on attribute" do
+  describe "attribute permissions" do
     test "should allow action if :where attribute matches" do
       policy =
         %Janus.Policy{}
@@ -169,7 +172,7 @@ defmodule JanusTest do
     end
   end
 
-  describe "permissions based on associations" do
+  describe "association permissions" do
     test "should allow action if associated :where attribute matches" do
       policy =
         %Janus.Policy{}
@@ -199,6 +202,49 @@ defmodule JanusTest do
 
       assert Janus.allows?(policy, :edit, post)
       assert [_] = Janus.filter(Post, :edit, policy) |> Repo.all()
+    end
+
+    test ":preload_filtered should load filtered associations" do
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Thread, where: [archived: false])
+        |> allow(:read, Post, where: [archived: false])
+
+      [_t1, _t2, t3] = for _ <- 1..3, do: thread_fixture()
+      _ = t3 |> Thread.changeset(%{archived: true}) |> Repo.update!()
+
+      query = Janus.filter(Post, :read, policy, preload_filtered: :thread)
+
+      assert [%Post{thread: %Thread{}}, %Post{thread: %Thread{}}] = query |> Repo.all()
+    end
+
+    test ":preload_filtered should include records with empty associations" do
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, User)
+
+      _ = user_fixture()
+
+      query = Janus.filter(User, :read, policy, preload_filtered: :threads)
+
+      assert [%User{}] = query |> Repo.all()
+    end
+
+    test ":preload_filtered should load nested associations" do
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Thread, where: [archived: false])
+        |> allow(:read, Post, where: [archived: false, thread: allows(:read)])
+
+      [_t1, _t2, t3] = for _ <- 1..3, do: thread_fixture()
+      _ = t3 |> Thread.changeset(%{archived: true}) |> Repo.update!()
+
+      query = Janus.filter(Post, :read, policy, preload_filtered: [thread: :posts])
+
+      assert [
+               %Post{thread: %Thread{posts: [%Post{}]}},
+               %Post{thread: %Thread{posts: [%Post{}]}}
+             ] = query |> Repo.all()
     end
   end
 

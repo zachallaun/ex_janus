@@ -1,10 +1,14 @@
 defmodule Janus.Filter do
   @moduledoc false
-  alias __MODULE__
+
   import Ecto.Query
+  alias Janus.Filter
+
+  @root_binding :__object__
 
   @type t :: %Filter{
           policy: Janus.Policy.t(),
+          action: Janus.action(),
           schema: Janus.schema(),
           binding: atom(),
           parent_binding: atom(),
@@ -12,14 +16,22 @@ defmodule Janus.Filter do
           joins: keyword()
         }
 
-  defstruct [:policy, :schema, :binding, :parent_binding, :dynamic, joins: []]
+  defstruct [:policy, :action, :schema, :binding, :parent_binding, :dynamic, joins: []]
 
   defimpl Ecto.Queryable do
     def to_query(filter), do: Janus.Filter.to_query(filter)
   end
 
-  @doc "Convert a `%Filter{}` to an `%Ecto.Query{}`."
-  def to_query(%Filter{} = filter, query \\ nil) do
+  @doc """
+  Converts a `%Filter{}` struct into an `%Ecto.Query{}`
+
+  ## Options
+
+  * `:query` - initial query to build off of (defaults to `filter.struct`)
+  * `:preload_filtered` - preload associated resources, filtering them using the same
+    policy and action present on the filter
+  """
+  def to_query(%Filter{} = filter, opts \\ []) do
     %{
       schema: schema,
       binding: binding,
@@ -27,9 +39,167 @@ defmodule Janus.Filter do
       joins: joins
     } = filter
 
-    query = query || schema
-    query = from(query, as: ^binding, where: ^dynamic)
+    initial_query = Keyword.get(opts, :query, schema)
 
+    from(initial_query, as: ^binding, where: ^dynamic)
+    |> with_joins(joins)
+    |> with_preload_filtered(filter, opts[:preload_filtered], opts[:__apply_preload__])
+  end
+
+  @doc """
+  Filters a query using action and policy.
+
+  Note that opts must have been processed using `prep_opts/1` at macro time.
+  """
+  def filter(query_or_schema, action, policy, opts \\ []) do
+    {query, schema} = derive_query_and_schema(query_or_schema)
+    rule = Janus.Policy.rule_for(policy, action, schema)
+
+    %Janus.Filter{
+      policy: policy,
+      action: action,
+      schema: schema,
+      dynamic: false,
+      binding: @root_binding
+    }
+    |> filter_or_where(rule.allow)
+    |> filter_and_where_not(rule.forbid)
+    |> filter_or_where(rule.always_allow)
+    |> to_query(Keyword.put(opts, :query, query))
+  end
+
+  @doc """
+  Prepare filter options.
+
+  Required to be run at macro time in order to generate bindings, etc. that are required
+  by Ecto macros.
+  """
+  def prep_opts(opts \\ []) do
+    unless Keyword.keyword?(opts) do
+      raise "options must be a keyword list, got: #{inspect(opts)}"
+    end
+
+    opts =
+      if p = opts[:preload_filtered] do
+        preload_expr =
+          quote do
+            fn query ->
+              require Ecto.Query
+
+              Ecto.Query.preload(
+                query,
+                unquote(preload_bindings(p)),
+                unquote(preload_opt(p))
+              )
+            end
+          end
+
+        Keyword.put(
+          opts,
+          :__apply_preload__,
+          preload_expr
+        )
+      else
+        opts
+      end
+
+    opts
+  end
+
+  defp derive_query_and_schema(%Ecto.Query{} = query) do
+    {_, schema} = derive_query_and_schema(query.from.source)
+    {query, schema}
+  end
+
+  defp derive_query_and_schema(%Ecto.SubQuery{query: query} = subquery) do
+    {_, schema} = derive_query_and_schema(query)
+    {Ecto.Query.subquery(subquery), schema}
+  end
+
+  defp derive_query_and_schema({%Ecto.Query{} = query, schema}) do
+    {_, schema} = derive_query_and_schema(schema)
+    {query, schema}
+  end
+
+  defp derive_query_and_schema({_, schema}) do
+    derive_query_and_schema(schema)
+  end
+
+  defp derive_query_and_schema(schema) when is_atom(schema) and not is_nil(schema) do
+    {schema, schema}
+  end
+
+  defp derive_query_and_schema(_) do
+    raise "filter/4 requires a schema or a query with a schema as its source"
+  end
+
+  defp filter_or_where(filter, []), do: filter
+
+  defp filter_or_where(filter, conditions) do
+    f = with_conditions(filter, conditions)
+    combine(filter, :or, f)
+  end
+
+  defp filter_and_where_not(filter, []), do: filter
+
+  defp filter_and_where_not(filter, conditions) do
+    f = with_conditions(filter, conditions)
+    combine(filter, :and_not, f)
+  end
+
+  defp with_conditions(%Filter{} = filter, conditions) do
+    for condition <- conditions, reduce: filter do
+      filter ->
+        f = apply_condition(condition, filter)
+        combine(filter, :or, f)
+    end
+  end
+
+  defp combine(f1, op, f2) do
+    f1
+    |> Map.put(:dynamic, combine_dynamic(f1.dynamic, op, f2.dynamic))
+    |> Map.put(:joins, merge_joins(f1.joins, f2.joins))
+  end
+
+  # Generate flat list of quoted bindings to pass to preload
+  # e.g. Given [foo: :bar] ->
+  #      preload(query, [foo: foo, bar: bar], ...)
+  defp preload_bindings(preloads) do
+    preloads
+    |> List.wrap()
+    |> Enum.flat_map(fn
+      preload when is_atom(preload) ->
+        [preload_binding(preload)]
+
+      {preload, preloads} ->
+        [preload_binding(preload) | preload_bindings(preloads)]
+
+      preloads when is_list(preloads) ->
+        Enum.map(preloads, &preload_bindings/1)
+    end)
+  end
+
+  defp preload_binding(preload) when is_atom(preload) do
+    {preload, Macro.var(preload, __MODULE__)}
+  end
+
+  # Generate nested kw list to pass to preload
+  # e.g. Given [foo: :bar]
+  #      preload(query, ..., [foo: {foo, bar: bar}])
+  defp preload_opt(preload) when is_atom(preload) do
+    [{preload, Macro.var(preload, __MODULE__)}]
+  end
+
+  defp preload_opt({preload, preloads}) do
+    [{preload, binding}] = preload_opt(preload)
+    [{preload, {binding, preload_opt(preloads)}}]
+  end
+
+  defp preload_opt(preloads) when is_list(preloads) do
+    Enum.flat_map(preloads, &preload_opt/1)
+  end
+
+  defp with_joins(query, joins) do
     for join <- joins, reduce: query do
       query ->
         case join do
@@ -42,34 +212,70 @@ defmodule Janus.Filter do
     end
   end
 
-  @doc "Create a new filter."
-  def new(policy, schema, binding, dynamic \\ nil) do
-    %Filter{
-      policy: policy,
-      schema: schema,
-      binding: binding,
-      parent_binding: binding,
-      dynamic: dynamic
+  defp with_preload_filtered(query, _filter, nil, nil), do: query
+
+  defp with_preload_filtered(query, filter, preload_opt, apply_preload) do
+    preloads = calc_preloads(preload_opt, filter.schema, filter.binding, filter)
+
+    query =
+      for preload <- preloads, reduce: query do
+        query ->
+          related_as_filtered = :"#{preload.related_as}_f"
+
+          with_related =
+            with_named_binding(query, preload.related_as, fn query, related_as ->
+              from([{^preload.owner_as, r}] in query,
+                left_join: assoc(r, ^preload.assoc),
+                as: ^related_as
+              )
+            end)
+
+          from(with_related,
+            left_lateral_join:
+              subquery(
+                from(
+                  a in preload.related_query,
+                  where:
+                    field(a, ^preload.related_key) ==
+                      field(parent_as(^preload.owner_as), ^preload.owner_key),
+                  select: %{id: a.id, lateral_selected: true}
+                )
+              ),
+            as: ^related_as_filtered,
+            on: as(^preload.related_as).id == as(^related_as_filtered).id,
+            where: is_nil(as(^preload.related_as).id) or as(^related_as_filtered).lateral_selected
+          )
+      end
+
+    apply_preload.(query)
+  end
+
+  defp calc_preloads(assoc, schema, binding, filter) when is_atom(assoc) do
+    association = schema.__schema__(:association, assoc)
+
+    preload = %{
+      assoc: assoc,
+      owner_as: binding,
+      owner_key: association.owner_key,
+      related_query: filter(association.queryable, filter.action, filter.policy),
+      related_as: assoc,
+      related_key: association.related_key
     }
+
+    [preload]
   end
 
-  @doc """
-  Create a new filter using `filter` that filters to resources that match one of the
-  given `conditions`.
-  """
-  def with_conditions(%Filter{} = filter, conditions) do
-    for condition <- conditions, reduce: filter do
-      filter ->
-        f = apply_condition(condition, filter)
-        combine(filter, :or, f)
-    end
+  defp calc_preloads({assoc, rest}, schema, binding, filter) do
+    association = schema.__schema__(:association, assoc)
+
+    calc_preloads(assoc, schema, binding, filter) ++
+      calc_preloads(rest, association.related, assoc, filter)
   end
 
-  @doc "Combine two filters using the given logical operation."
-  def combine(f1, op, f2) do
-    f1
-    |> Map.put(:dynamic, combine_dynamic(f1.dynamic, op, f2.dynamic))
-    |> Map.put(:joins, merge_joins(f1.joins, f2.joins))
+  defp calc_preloads(preloads, schema, binding, filter) when is_list(preloads) do
+    Enum.flat_map(preloads, fn preload ->
+      calc_preloads(preload, schema, binding, filter)
+    end)
   end
 
   defp combine_dynamic(d1, :and, d2), do: simplify_and(d1, d2)
@@ -108,7 +314,7 @@ defmodule Janus.Filter do
   end
 
   defp apply_clause({:__janus_derived__, action}, filter) do
-    subquery = Janus.filter(filter.schema, action, filter.policy)
+    subquery = filter(filter.schema, action, filter.policy)
     %{filter | joins: merge_joins(filter.joins, __subquery__: {subquery, filter.binding})}
   end
 
@@ -127,8 +333,12 @@ defmodule Janus.Filter do
     end
   end
 
-  defp associated_schema(filter, field) do
-    case filter.schema.__schema__(:association, field) do
+  defp associated_schema(%Filter{} = filter, field) do
+    associated_schema(filter.schema, field)
+  end
+
+  defp associated_schema(schema, field) when is_atom(schema) do
+    case schema.__schema__(:association, field) do
       nil -> nil
       assoc -> assoc.related
     end

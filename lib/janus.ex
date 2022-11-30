@@ -5,7 +5,7 @@ defmodule Janus do
              |> String.split("<!-- MDOC -->")
              |> Enum.fetch!(1)
 
-  import Ecto.Query, only: [from: 2, dynamic: 1, dynamic: 2], warn: false
+  require Ecto.Query
 
   @type action :: atom()
   @type schema :: atom()
@@ -17,6 +17,7 @@ defmodule Janus do
   defmacro __using__(_opts) do
     quote do
       @behaviour Janus
+      require Janus
       import Janus.Policy, except: [rule_for: 3]
 
       @doc "See `Janus.allows?/3`"
@@ -30,27 +31,21 @@ defmodule Janus do
       end
 
       @doc "See `Janus.filter/4`"
-      def filter(schema, action, actor) do
-        Janus.filter(schema, action, __policy_for__(actor))
+      defmacro filter(query_or_schema, action, actor, opts \\ []) do
+        quote do
+          Janus.filter(
+            unquote(query_or_schema),
+            unquote(action),
+            unquote(__MODULE__).__policy_for__(unquote(actor)),
+            unquote(opts)
+          )
+        end
       end
 
-      @doc "See `Janus.filter/4`"
-      def filter(query, schema, action, actor) do
-        Janus.filter(query, schema, action, __policy_for__(action))
-      end
-
-      defoverridable allows?: 3, forbids?: 3, filter: 3
-
-      defp __policy_for__(%Janus.Policy{} = policy), do: policy
-      defp __policy_for__(actor), do: policy_for(actor)
+      def __policy_for__(%Janus.Policy{} = policy), do: policy
+      def __policy_for__(actor), do: policy_for(actor)
     end
   end
-
-  # TODO
-  # Detect cyclic rules, e.g.
-  #   policy
-  #   |> allow(:read, Thing, where: allows(:read, Thang))
-  #   |> allow(:read, Thang, where: allows(:read, Thing))
 
   @doc "Returns `true` if the given `policy` allows `action` to be taken on `object`."
   def allows?(policy, action, %schema{} = object) do
@@ -119,46 +114,23 @@ defmodule Janus do
     end
   end
 
-  @root_binding :__object__
-
   @doc """
-  Returns an `Ecto.Query` that filters records from `schema` to those that can have
+  Creates an `Ecto.Query` that filters records from `schema` to those that can have
   `action` performed according to the `policy`.
+
+  ## Options
+
+  * `:preload_filtered` - preload associated resources on the result, but filtered to
+    those that are allowed based on the action and policy.
   """
-  def filter(query, schema, action, policy) when is_atom(schema) do
-    rule = Janus.Policy.rule_for(policy, action, schema)
-
-    Janus.Filter.new(policy, schema, @root_binding, false)
-    |> or_where(rule.allow)
-    |> and_where_not(rule.forbid)
-    |> or_where(rule.always_allow)
-    |> Janus.Filter.to_query(query)
-  end
-
-  def filter(query_or_schema, action, policy) do
-    filter(query_or_schema, derive_schema(query_or_schema), action, policy)
-  end
-
-  defp derive_schema(%Ecto.Query{} = query), do: derive_schema(query.from.source)
-  defp derive_schema(%Ecto.SubQuery{query: query}), do: derive_schema(query)
-  defp derive_schema({_, schema}), do: derive_schema(schema)
-  defp derive_schema(schema) when is_atom(schema) and not is_nil(schema), do: schema
-
-  defp derive_schema(_) do
-    raise "filter/3 requires a schema or a query with a schema as its source"
-  end
-
-  defp or_where(filter, []), do: filter
-
-  defp or_where(filter, conditions) do
-    f = Janus.Filter.with_conditions(filter, conditions)
-    Janus.Filter.combine(filter, :or, f)
-  end
-
-  defp and_where_not(filter, []), do: filter
-
-  defp and_where_not(filter, conditions) do
-    f = Janus.Filter.with_conditions(filter, conditions)
-    Janus.Filter.combine(filter, :and_not, f)
+  defmacro filter(query_or_schema, action, policy, opts \\ []) do
+    quote bind_quoted: [
+            query_or_schema: query_or_schema,
+            action: action,
+            policy: policy,
+            opts: Janus.Filter.prep_opts(opts)
+          ] do
+      Janus.Filter.filter(query_or_schema, action, policy, opts)
+    end
   end
 end
