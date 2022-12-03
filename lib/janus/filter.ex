@@ -237,7 +237,25 @@ defmodule Janus.Filter do
   end
 
   defp dynamic_compare(filter, field, value) do
-    dynamic(field(as(^filter.binding), ^field) == ^value)
+    type_info = filter.schema.__schema__(:type, field)
+    dumped_value = dump!(type_info, value)
+
+    dynamic(field(as(^filter.binding), ^field) == ^dumped_value)
+  end
+
+  defp dump!(type_info, value) do
+    case dump(type_info, value) do
+      {:ok, dumped} -> dumped
+      _ -> raise "could not dump #{inspect(value)} to type #{inspect(type_info)}"
+    end
+  end
+
+  defp dump({:parameterized, type, params}, value) do
+    type.dump(value, nil, params)
+  end
+
+  defp dump(type, value) when is_atom(type) do
+    Ecto.Type.dump(type, value)
   end
 
   defp associated_schema(%Filter{} = filter, field) do

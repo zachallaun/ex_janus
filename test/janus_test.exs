@@ -170,6 +170,19 @@ defmodule JanusTest do
       assert Janus.forbids?(policy, :read, unreadable)
       assert [%Thread{id: ^readable_id}] = Janus.filter(Thread, :read, policy) |> Repo.all()
     end
+
+    test "should dump values to the correct underlying type" do
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, User, where: [status: :active])
+
+      [%{id: u1_id} = u1, u2] = [user_fixture(), user_fixture()]
+      {:ok, u2} = u2 |> User.changeset(%{status: :banned}) |> Repo.update()
+
+      assert Janus.allows?(policy, :read, u1)
+      assert Janus.forbids?(policy, :read, u2)
+      assert [%User{id: ^u1_id}] = Janus.filter(User, :read, policy) |> Repo.all()
+    end
   end
 
   describe "function permissions" do

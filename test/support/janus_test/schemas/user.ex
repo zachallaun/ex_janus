@@ -7,6 +7,7 @@ defmodule JanusTest.Schemas.User do
   schema "users" do
     field :name, :string
     field :roles, :map, default: %{}
+    field :status, Ecto.Enum, values: [:active, :banned], default: :active
 
     has_many :threads, Thread, foreign_key: :creator_id
     has_many :posts, Post, foreign_key: :author_id
@@ -14,6 +15,6 @@ defmodule JanusTest.Schemas.User do
 
   def changeset(user, attrs) do
     user
-    |> cast(attrs, [:roles, :name])
+    |> cast(attrs, [:roles, :name, :status])
   end
 end

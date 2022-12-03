@@ -5,6 +5,7 @@ defmodule JanusTest.Repo.Migrations.AddForumTables do
     create table("users") do
       add :name, :string
       add :roles, :map
+      add :status, :string
     end
 
     create table("threads") do
