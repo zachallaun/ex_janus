@@ -28,7 +28,7 @@ defmodule Janus.Filter do
   ## Options
 
   * `:query` - initial query to build off of (defaults to `filter.struct`)
-  * `:preload_filtered` - preload associated resources, filtering them using the same
+  * `:preload_authorized` - preload associated resources, filtering them using the same
     policy and action present on the filter
   """
   def to_query(%Filter{} = filter, opts \\ []) do
@@ -43,7 +43,7 @@ defmodule Janus.Filter do
 
     from(initial_query, as: ^binding, where: ^dynamic)
     |> with_joins(joins)
-    |> with_preload_filtered(filter, opts[:preload_filtered], opts[:__apply_preload__])
+    |> with_preload_authorized(filter, opts[:preload_authorized], opts[:__apply_preload__])
   end
 
   @doc """
@@ -80,7 +80,7 @@ defmodule Janus.Filter do
     end
 
     opts =
-      if p = opts[:preload_filtered] do
+      if p = opts[:preload_authorized] do
         preload_expr =
           quote do
             fn query ->
@@ -285,9 +285,9 @@ defmodule Janus.Filter do
   defp simplify_or(clause, false), do: clause
   defp simplify_or(clause1, clause2), do: dynamic(^clause1 or ^clause2)
 
-  defp with_preload_filtered(query, _filter, nil, nil), do: query
+  defp with_preload_authorized(query, _filter, nil, nil), do: query
 
-  defp with_preload_filtered(query, filter, preload_opt, apply_preload) do
+  defp with_preload_authorized(query, filter, preload_opt, apply_preload) do
     preloads = calc_preloads(preload_opt, filter.schema, filter.binding, filter)
 
     query =

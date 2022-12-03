@@ -20,22 +20,17 @@ defmodule Janus do
       require Janus
       import Janus.Policy, except: [rule_for: 3]
 
-      @doc "See `Janus.allows?/3`"
-      def allows?(actor, action, object) do
-        Janus.allows?(__policy_for__(actor), action, object)
+      @doc "See `Janus.authorize/4`"
+      def authorize(object, action, actor, opts \\ []) do
+        Janus.authorize(object, action, __policy_for__(actor), opts)
       end
 
-      @doc "See `Janus.forbids?/3`"
-      def forbids?(actor, action, object) do
-        !allows?(actor, action, object)
-      end
-
-      @doc "See `Janus.filter/4`"
-      defmacro filter(query_or_schema, action, actor, opts \\ []) do
+      @doc "See `Janus.authorized/4`"
+      defmacro authorized(query_or_schema, action, actor, opts \\ []) do
         quote do
           require Janus
 
-          Janus.filter(
+          Janus.authorized(
             unquote(query_or_schema),
             unquote(action),
             unquote(__MODULE__).__policy_for__(unquote(actor)),
@@ -49,19 +44,22 @@ defmodule Janus do
     end
   end
 
-  @doc "Returns `true` if the given `policy` allows `action` to be taken on `object`."
-  def allows?(policy, action, %schema{} = object) do
+  @doc """
+  Authorize that the given `action` is allowed for `object` based on `policy`.
+
+  Returns `{:ok, object}` if the action is authorized and `:error` otherwise.
+  """
+  def authorize(%schema{} = object, action, policy, _opts \\ []) do
     rule = Janus.Policy.rule_for(policy, action, schema)
 
     false
     |> allow_if_any?(rule.allow, policy, object)
     |> forbid_if_any?(rule.forbid, policy, object)
     |> allow_if_any?(rule.always_allow, policy, object)
-  end
-
-  @doc "Returns `true` if the given `policy` forbids `action` to be taken on `object`."
-  def forbids?(policy, action, object) do
-    !allows?(policy, action, object)
+    |> case do
+      true -> {:ok, object}
+      false -> :error
+    end
   end
 
   defp allow_if_any?(true, _conditions, _policy, _object), do: true
@@ -95,7 +93,10 @@ defmodule Janus do
   end
 
   defp clause_match?({:__janus_derived__, action}, policy, object) do
-    allows?(policy, action, object)
+    case authorize(object, action, policy) do
+      {:ok, _} -> true
+      :error -> false
+    end
   end
 
   defp clause_match?({field, value}, policy, %schema{} = object) do
@@ -134,10 +135,10 @@ defmodule Janus do
 
   ## Options
 
-  * `:preload_filtered` - preload associated resources on the result, but filtered to
+  * `:preload_authorized` - preload associated resources on the result, but filtered to
     those that are allowed based on the action and policy.
   """
-  defmacro filter(query_or_schema, action, policy, opts \\ []) do
+  defmacro authorized(query_or_schema, action, policy, opts \\ []) do
     quote bind_quoted: [
             query_or_schema: query_or_schema,
             action: action,

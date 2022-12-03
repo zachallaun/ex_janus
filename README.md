@@ -129,26 +129,31 @@ Now that we've defined a policy, we can use it for two main functions:
 1. authorization checks (can the actor do _this_ to _thing_), and
 2. data loading (fetch all the _things_ that the actor can do _this_ to).
 
-Auth/permissions checks are done with `Janus.allows?/3` and `Janus.forbids?/3`.
-Data loading is done with `Janus.filter/4`, which returns a composable `Ecto.Query`.
+Auth/permissions checks are done with `Janus.authorize/4`.
+Data loading is done with `Janus.authorized/4`, which returns an `Ecto.Query`.
 (Note that `use Janus` defined these functions on our policy module as well.)
 
 ```elixir
 import Ecto.Query
+alias Discoarse.{Forum, Repo}
 
-alias Discoarse.{Accounts, Forum, Policy, Repo}
+# Imports `authorize/4` and `authorized/4`.
+use Discoarse.Policy
 
-# Authorization checks
-Policy.allows?(moderator, :edit, some_thread) #=> true, mods can edit all threads
-Policy.allows?(user, :edit, some_thread) #=> true if the user created the thread
-Policy.allows?(nil, :edit, some_thread) #=> false, guests can't edit any threads
+# Authorize individual resources
+{:ok, thread} = authorize(thread, :edit, moderator)
+{:ok, thread} = authorize(thread, :edit, user)
+:error = authorize(thread, :edit, nil)
 
-# Data loading
+# Filter a query to those that are authorized
 Forum.Thread
-|> Policy.filter(:edit, user)
 |> order_by(desc: :inserted_at)
+|> authorized(:edit, user)
 |> Repo.all()
+
+authorized(Forum.Thread, :edit, user)
 ```
+
 
 <!-- MDOC -->
 
