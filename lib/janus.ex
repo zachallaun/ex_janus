@@ -33,6 +33,8 @@ defmodule Janus do
       @doc "See `Janus.filter/4`"
       defmacro filter(query_or_schema, action, actor, opts \\ []) do
         quote do
+          require Janus
+
           Janus.filter(
             unquote(query_or_schema),
             unquote(action),
