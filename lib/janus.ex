@@ -20,17 +20,7 @@ defmodule Janus do
       require Janus
       import Janus.Policy, except: [rule_for: 3]
 
-      @doc false
-      defmacro __using__(_opts) do
-        quote do
-          require unquote(__MODULE__)
-
-          import unquote(__MODULE__),
-            only: [authorize: 3, authorize: 4, authorized: 3, authorized: 4]
-        end
-      end
-
-      defoverridable __using__: 1
+      unquote(default_using())
 
       @doc "See `Janus.authorize/4`"
       def authorize(object, action, actor, opts \\ []) do
@@ -53,6 +43,22 @@ defmodule Janus do
 
       def __policy_for__(%Janus.Policy{} = policy), do: policy
       def __policy_for__(actor), do: policy_for(actor)
+    end
+  end
+
+  defp default_using do
+    quote unquote: false do
+      @doc false
+      defmacro __using__(_opts) do
+        quote do
+          require unquote(__MODULE__)
+
+          import unquote(__MODULE__),
+            only: [authorize: 3, authorize: 4, authorized: 3, authorized: 4]
+        end
+      end
+
+      defoverridable __using__: 1
     end
   end
 
