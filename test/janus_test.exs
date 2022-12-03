@@ -48,6 +48,15 @@ defmodule JanusTest do
 
       assert [_] = Repo.all(query)
     end
+
+    test "defines __using__ and imports authorize and authorized" do
+      use ExamplePolicy
+
+      t = thread_fixture()
+
+      assert {:ok, ^t} = authorize(t, :read, :user)
+      assert [%Thread{}] = authorized(Thread, :read, :user) |> Repo.all()
+    end
   end
 
   describe "authorized/4" do
