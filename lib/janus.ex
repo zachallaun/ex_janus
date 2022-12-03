@@ -100,8 +100,20 @@ defmodule Janus do
     if field in schema.__schema__(:associations) do
       clause_match?(value, policy, fetch_associated!(object, field))
     else
-      Map.get(object, field) == value
+      compare_field(object, field, value)
     end
+  end
+
+  defp compare_field(object, field, fun) when is_function(fun, 3) do
+    fun.(:boolean, object, field)
+  end
+
+  defp compare_field(_object, _field, fun) when is_function(fun) do
+    raise "permission functions must have arity 3 (#{inspect(fun)})"
+  end
+
+  defp compare_field(object, field, value) do
+    Map.get(object, field) == value
   end
 
   defp fetch_associated!(object, field) do

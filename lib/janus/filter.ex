@@ -161,44 +161,6 @@ defmodule Janus.Filter do
     |> Map.put(:joins, merge_joins(f1.joins, f2.joins))
   end
 
-  # Generate flat list of quoted bindings to pass to preload
-  # e.g. Given [foo: :bar] ->
-  #      preload(query, [foo: foo, bar: bar], ...)
-  defp preload_bindings(preloads) do
-    preloads
-    |> List.wrap()
-    |> Enum.flat_map(fn
-      preload when is_atom(preload) ->
-        [preload_binding(preload)]
-
-      {preload, preloads} ->
-        [preload_binding(preload) | preload_bindings(preloads)]
-
-      preloads when is_list(preloads) ->
-        Enum.map(preloads, &preload_bindings/1)
-    end)
-  end
-
-  defp preload_binding(preload) when is_atom(preload) do
-    {preload, Macro.var(preload, __MODULE__)}
-  end
-
-  # Generate nested kw list to pass to preload
-  # e.g. Given [foo: :bar]
-  #      preload(query, ..., [foo: {foo, bar: bar}])
-  defp preload_opt(preload) when is_atom(preload) do
-    [{preload, Macro.var(preload, __MODULE__)}]
-  end
-
-  defp preload_opt({preload, preloads}) do
-    [{preload, binding}] = preload_opt(preload)
-    [{preload, {binding, preload_opt(preloads)}}]
-  end
-
-  defp preload_opt(preloads) when is_list(preloads) do
-    Enum.flat_map(preloads, &preload_opt/1)
-  end
-
   defp with_joins(query, joins) do
     for join <- joins, reduce: query do
       query ->
@@ -210,72 +172,6 @@ defmodule Janus.Filter do
             from([{^binding, x}] in query, join: assoc(x, ^assoc), as: ^assoc)
         end
     end
-  end
-
-  defp with_preload_filtered(query, _filter, nil, nil), do: query
-
-  defp with_preload_filtered(query, filter, preload_opt, apply_preload) do
-    preloads = calc_preloads(preload_opt, filter.schema, filter.binding, filter)
-
-    query =
-      for preload <- preloads, reduce: query do
-        query ->
-          related_as_filtered = :"#{preload.related_as}_f"
-
-          with_related =
-            with_named_binding(query, preload.related_as, fn query, related_as ->
-              from([{^preload.owner_as, r}] in query,
-                left_join: assoc(r, ^preload.assoc),
-                as: ^related_as
-              )
-            end)
-
-          from(with_related,
-            left_lateral_join:
-              subquery(
-                from(
-                  a in preload.related_query,
-                  where:
-                    field(a, ^preload.related_key) ==
-                      field(parent_as(^preload.owner_as), ^preload.owner_key),
-                  select: %{id: a.id, lateral_selected: true}
-                )
-              ),
-            as: ^related_as_filtered,
-            on: as(^preload.related_as).id == as(^related_as_filtered).id,
-            where: is_nil(as(^preload.related_as).id) or as(^related_as_filtered).lateral_selected
-          )
-      end
-
-    apply_preload.(query)
-  end
-
-  defp calc_preloads(assoc, schema, binding, filter) when is_atom(assoc) do
-    association = schema.__schema__(:association, assoc)
-
-    preload = %{
-      assoc: assoc,
-      owner_as: binding,
-      owner_key: association.owner_key,
-      related_query: filter(association.queryable, filter.action, filter.policy),
-      related_as: assoc,
-      related_key: association.related_key
-    }
-
-    [preload]
-  end
-
-  defp calc_preloads({assoc, rest}, schema, binding, filter) do
-    association = schema.__schema__(:association, assoc)
-
-    calc_preloads(assoc, schema, binding, filter) ++
-      calc_preloads(rest, association.related, assoc, filter)
-  end
-
-  defp calc_preloads(preloads, schema, binding, filter) when is_list(preloads) do
-    Enum.flat_map(preloads, fn preload ->
-      calc_preloads(preload, schema, binding, filter)
-    end)
   end
 
   defp combine_dynamic(d1, :and, d2), do: simplify_and(d1, d2)
@@ -328,9 +224,20 @@ defmodule Janus.Filter do
           joins: [{field, filter.binding}]
       })
     else
-      dynamic = dynamic(field(as(^filter.binding), ^field) == ^value)
-      %{filter | dynamic: dynamic}
+      %{filter | dynamic: dynamic_compare(filter, field, value)}
     end
+  end
+
+  defp dynamic_compare(filter, field, fun) when is_function(fun, 3) do
+    fun.(:dynamic, filter.binding, field)
+  end
+
+  defp dynamic_compare(_filter, _field, fun) when is_function(fun) do
+    raise "permission functions must have arity 3 (#{inspect(fun)})"
+  end
+
+  defp dynamic_compare(filter, field, value) do
+    dynamic(field(as(^filter.binding), ^field) == ^value)
   end
 
   defp associated_schema(%Filter{} = filter, field) do
@@ -359,4 +266,108 @@ defmodule Janus.Filter do
   defp simplify_or(clause, nil), do: clause
   defp simplify_or(clause, false), do: clause
   defp simplify_or(clause1, clause2), do: dynamic(^clause1 or ^clause2)
+
+  defp with_preload_filtered(query, _filter, nil, nil), do: query
+
+  defp with_preload_filtered(query, filter, preload_opt, apply_preload) do
+    preloads = calc_preloads(preload_opt, filter.schema, filter.binding, filter)
+
+    query =
+      for preload <- preloads, reduce: query do
+        query ->
+          related_as_filtered = :"#{preload.related_as}_f"
+
+          with_related =
+            with_named_binding(query, preload.related_as, fn query, related_as ->
+              from([{^preload.owner_as, r}] in query,
+                left_join: assoc(r, ^preload.assoc),
+                as: ^related_as
+              )
+            end)
+
+          from(with_related,
+            left_lateral_join:
+              subquery(
+                from(
+                  a in preload.related_query,
+                  where:
+                    field(a, ^preload.related_key) ==
+                      field(parent_as(^preload.owner_as), ^preload.owner_key),
+                  select: %{id: a.id, lateral_selected: true}
+                )
+              ),
+            as: ^related_as_filtered,
+            on: as(^preload.related_as).id == as(^related_as_filtered).id,
+            where: is_nil(as(^preload.related_as).id) or as(^related_as_filtered).lateral_selected
+          )
+      end
+
+    apply_preload.(query)
+  end
+
+  # Generate flat list of quoted bindings to pass to preload
+  # e.g. Given [foo: :bar] ->
+  #      preload(query, [foo: foo, bar: bar], ...)
+  defp preload_bindings(preloads) do
+    preloads
+    |> List.wrap()
+    |> Enum.flat_map(fn
+      preload when is_atom(preload) ->
+        [preload_binding(preload)]
+
+      {preload, preloads} ->
+        [preload_binding(preload) | preload_bindings(preloads)]
+
+      preloads when is_list(preloads) ->
+        Enum.map(preloads, &preload_bindings/1)
+    end)
+  end
+
+  defp preload_binding(preload) when is_atom(preload) do
+    {preload, Macro.var(preload, __MODULE__)}
+  end
+
+  # Generate nested kw list to pass to preload
+  # e.g. Given [foo: :bar]
+  #      preload(query, ..., [foo: {foo, bar: bar}])
+  defp preload_opt(preload) when is_atom(preload) do
+    [{preload, Macro.var(preload, __MODULE__)}]
+  end
+
+  defp preload_opt({preload, preloads}) do
+    [{preload, binding}] = preload_opt(preload)
+    [{preload, {binding, preload_opt(preloads)}}]
+  end
+
+  defp preload_opt(preloads) when is_list(preloads) do
+    Enum.flat_map(preloads, &preload_opt/1)
+  end
+
+  defp calc_preloads(assoc, schema, binding, filter) when is_atom(assoc) do
+    association = schema.__schema__(:association, assoc)
+
+    preload = %{
+      assoc: assoc,
+      owner_as: binding,
+      owner_key: association.owner_key,
+      related_query: filter(association.queryable, filter.action, filter.policy),
+      related_as: assoc,
+      related_key: association.related_key
+    }
+
+    [preload]
+  end
+
+  defp calc_preloads({assoc, rest}, schema, binding, filter) do
+    association = schema.__schema__(:association, assoc)
+
+    calc_preloads(assoc, schema, binding, filter) ++
+      calc_preloads(rest, association.related, assoc, filter)
+  end
+
+  defp calc_preloads(preloads, schema, binding, filter) when is_list(preloads) do
+    Enum.flat_map(preloads, fn preload ->
+      calc_preloads(preload, schema, binding, filter)
+    end)
+  end
 end

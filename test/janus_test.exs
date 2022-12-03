@@ -172,6 +172,59 @@ defmodule JanusTest do
     end
   end
 
+  describe "function permissions" do
+    test "can be used for attribute comparison" do
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Thread,
+          where: [
+            archived: fn
+              :boolean, record, :archived ->
+                !record.archived
+
+              :dynamic, binding, :archived ->
+                Ecto.Query.dynamic(not as(^binding).archived)
+            end
+          ]
+        )
+
+      [%{id: t1_id} = t1, t2] = [thread_fixture(), thread_fixture()]
+      {:ok, t2} = t2 |> Thread.changeset(%{archived: true}) |> Repo.update()
+
+      assert Janus.allows?(policy, :read, t1)
+      assert Janus.forbids?(policy, :read, t2)
+      assert [%Thread{id: ^t1_id}] = Janus.filter(Thread, :read, policy) |> Repo.all()
+    end
+
+    test "can be used for association attribute comparison" do
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Post,
+          where: [
+            thread: [
+              archived: fn
+                :boolean, record, :archived ->
+                  !record.archived
+
+                :dynamic, binding, :archived ->
+                  Ecto.Query.dynamic(not as(^binding).archived)
+              end
+            ]
+          ]
+        )
+
+      [%{posts: [%{id: p1_id} = p1]}, %{posts: [p2]} = t2] = [thread_fixture(), thread_fixture()]
+      {:ok, _} = t2 |> Thread.changeset(%{archived: true}) |> Repo.update()
+
+      p1 = Repo.preload(p1, :thread)
+      p2 = Repo.preload(p2, :thread)
+
+      assert Janus.allows?(policy, :read, p1)
+      assert Janus.forbids?(policy, :read, p2)
+      assert [%Post{id: ^p1_id}] = Janus.filter(Post, :read, policy) |> Repo.all()
+    end
+  end
+
   describe "association permissions" do
     test "should allow action if associated :where attribute matches" do
       policy =
