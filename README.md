@@ -4,11 +4,49 @@
 
 Flexible and composable authorization for resources backed by `Ecto` schemas.
 
-This library hopes to provide a small, flexible, and relatively low-level API for handling authorization with minimal magic.
-Janus tries to make as few decisions for you as possible, concentrating on answering these two questions:
+If you need to answer either of these questions, this library may be of use to you:
 
-1. Can this _actor_ perform this _action_ on this _resource_?
-2. What are all of the _resources_ that this _actor_ can perform this _action_ on?
+- Is this user allowed to perform this action on this resource?
+- What are all of the resources that this user can perform this action on?
+
+Janus operates on a **policy**, which is a data structure created for a specific user that represents the actions they're allowed to perform.
+You define policies by creating a **policy module** using the `Janus.Policy` API.
+
+Janus tries to make very few assumptions about your code:
+
+- it **does** assume you are using `Ecto` to define resources in your application
+- it **does not** assume anything about the actors (users) in your system
+  - you can use structs like `%User{}`,
+  - or atoms like `:normal_user` and `:admin_user`
+  - or `nil` to represent a logged-out user
+- it **does not** assume anything about how you model user permissions
+  - you can differentiate between separate structs like `%User{}` and `%Admin{}`
+  - or use an `Ecto.Enum` like `role`
+  - or store permissions dynamically in a separate table
+- it **does not** assume anything about how you structure your code
+  - you can define a single policy module that defines permissions for all of the resources in your application
+  - or you can define separate policy modules for separate contexts
+  - or you can compose policy modules from separate contexts into a single policy
+- it **does not** assume that it is being used everywhere
+  - you can use Janus where it makes sense and "hide" policy module usage inside contexts
+
+## Usage
+
+The API is intentionally minimal and is exposed by your policy module: one function and one macro.
+
+```elixir
+# Authorize an action on a resource by some actor
+{:ok, resource} = MyPolicy.authorize(resource, :some_action, some_user)
+
+# Query resources that can have an action performed by some actor
+%Ecto.Query{} = MyPolicy.authorized(ResourceSchema, :some_action, some_user)
+```
+
+For more, see the documentation for `authorize/4` and `authorized/4`.
+
+## Policy Modules
+
+See `Janus.Policy`.
 
 ## Example: Forum
 
