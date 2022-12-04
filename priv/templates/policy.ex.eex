@@ -1,0 +1,71 @@
+defmodule <%= module %> do
+  @moduledoc """
+  Provides authorization and loading for <%= app_namespace %> resources.
+  """
+
+  use Janus.Policy
+  alias <%= app_namespace %>.Repo
+
+  @impl true
+  def policy_for(policy, _user) do
+    # Attach permissions here using the `Janus.Policy` API
+    policy
+  end
+
+  @doc """
+  Load and authorize a resource.
+
+  Returns `{:ok, resource}` if the actor is authorized, otherwise `:error`.
+
+  ## Examples
+
+      iex> load_and_authorize(MyResource, :read, user, id: resource_id)
+      {:ok, %MyResource{...}}
+
+      iex> load_and_authorize(Restricted, :read, user, id: resource_id)
+      :error
+
+      iex> load_and_authorize(MyResource, :read, user, other_unique_key: key)
+      {:ok, %MyResource{...}}
+  """
+  def load_and_authorize(schema, action, actor, clauses)
+      when is_atom(schema) and is_list(clauses) do
+    schema
+    |> Repo.get_by(clauses)
+    |> authorize(action, actor)
+  end
+
+  @doc """
+  Loads authorized resources.
+
+  Returns `{:ok, resources}` if the actor has access to any resources from `schema`,
+  otherwise `:error`.
+
+  Note that `{:ok, []}` only means that the query returned no results, not that the actor
+  was unauthorized.
+
+  ## Examples
+
+      iex> load_authorized(MyResource, :read, user)
+      {:ok, [%MyResource{...}, ...]}
+
+      iex> load_authorized(Restricted, :read, user)
+      :error
+
+      iex> MyResource
+      ...> order_by(desc: :inserted_at)
+      ...> load_authorized(MyResource, :read, user)
+      {:ok, [%MyResource{...}, ...]}
+  """
+  defmacro load_authorized(query_or_schema, action, actor, opts \\ []) do
+    quote bind_quoted: [query_or_schema: query_or_schema, action: action, actor: actor, opts: opts] do
+      policy = unquote(__MODULE__).policy_for(actor)
+
+      if unquote(__MODULE__).any_authorized?(query_or_schema, action, actor) do
+        {:ok, unquote(__MODULE__).authorized(query_or_schema, action, policy) |> Repo.all()}
+      else
+        :error
+      end
+    end
+  end
+end
