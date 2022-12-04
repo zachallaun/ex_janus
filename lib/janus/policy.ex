@@ -38,14 +38,18 @@ defmodule Janus.Policy do
 
       unquote(default_using())
 
+      @doc "Returns the policy for the given actor."
+      def policy_for(%Janus.Policy{} = policy), do: policy
+      def policy_for(actor), do: policy_for(%Janus.Policy{}, actor)
+
       @doc "See `Janus.authorize/4`"
       def authorize(object, action, actor, opts \\ []) do
-        Janus.authorize(object, action, __policy_for__(actor), opts)
+        Janus.authorize(object, action, policy_for(actor), opts)
       end
 
       @doc "See `Janus.any_authorized?/3`"
       def any_authorized?(schema, action, actor) do
-        Janus.any_authorized?(schema, action, __policy_for__(actor))
+        Janus.any_authorized?(schema, action, policy_for(actor))
       end
 
       @doc "See `Janus.authorized/4`"
@@ -56,14 +60,11 @@ defmodule Janus.Policy do
           Janus.authorized(
             unquote(query_or_schema),
             unquote(action),
-            unquote(__MODULE__).__policy_for__(unquote(actor)),
+            unquote(__MODULE__).policy_for(unquote(actor)),
             unquote(opts)
           )
         end
       end
-
-      def __policy_for__(%Janus.Policy{} = policy), do: policy
-      def __policy_for__(actor), do: policy_for(%Janus.Policy{}, actor)
     end
   end
 
