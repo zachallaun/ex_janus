@@ -27,6 +27,11 @@ defmodule Janus do
         Janus.authorize(object, action, __policy_for__(actor), opts)
       end
 
+      @doc "See `Janus.any_authorized?/3`"
+      def any_authorized?(schema, action, actor) do
+        Janus.any_authorized?(schema, action, __policy_for__(actor))
+      end
+
       @doc "See `Janus.authorized/4`"
       defmacro authorized(query_or_schema, action, actor, opts \\ []) do
         quote do
@@ -144,6 +149,21 @@ defmodule Janus do
 
       value ->
         value
+    end
+  end
+
+  @doc """
+  Check whether any authorization permissions are set for the given schema and action.
+
+  This can be useful because `authorized/4` creates a query with no results if the user
+  is not authorized to see any elements of the resource, but it may not be possible to
+  differentiate between that and there just happening to be no records that match.
+  """
+  def any_authorized?(schema, action, policy) when is_atom(schema) do
+    case Janus.Policy.rule_for(policy, action, schema) do
+      %{allow: [], always_allow: []} -> false
+      %{always_allow: [_ | _]} -> true
+      _ -> true
     end
   end
 

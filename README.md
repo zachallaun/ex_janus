@@ -32,11 +32,14 @@ Janus tries to make very few assumptions about your code:
 
 ## Usage
 
-The API is intentionally minimal and is exposed by your policy module: one function and one macro.
+The API is intentionally minimal and is exposed by your policy module.
 
 ```elixir
 # Authorize an action on a resource by some actor
 {:ok, resource} = MyPolicy.authorize(resource, :some_action, some_user)
+
+# Check whether the user has any access to resources in `ResourceSchema`
+true = MyPolicy.any_authorized?(ResourceSchema, :some_action, some_user)
 
 # Query resources that can have an action performed by some actor
 %Ecto.Query{} = MyPolicy.authorized(ResourceSchema, :some_action, some_user)
@@ -162,7 +165,7 @@ defmodule Discoarse.Policy do
 end
 ```
 
-Now that we've defined a policy, we can use it for two main functions:
+Now that we've defined a policy, we can use it for two main purposes:
 
 1. authorization checks (can the actor do _this_ to _thing_), and
 2. data loading (fetch all the _things_ that the actor can do _this_ to).

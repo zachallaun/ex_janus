@@ -28,6 +28,10 @@ defmodule JanusTest do
       assert {:ok, ^thread} = ExamplePolicy.authorize(thread, :read, :user)
     end
 
+    test "defines any_authorized?/3" do
+      assert ExamplePolicy.any_authorized?(Thread, :read, :user)
+    end
+
     test "defines authorized/3 accepting a first-argument schema" do
       require ExamplePolicy
       _ = [thread_fixture(), thread_fixture(), thread_fixture()]
@@ -74,6 +78,52 @@ defmodule JanusTest do
       query = Ecto.Query.from(Ecto.Query.subquery(query))
 
       assert [_] = query |> Janus.authorized(:read, policy) |> Repo.all()
+    end
+  end
+
+  describe "any_authorized?/3" do
+    test "should check whether any permissions might authorize the action" do
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Thread)
+
+      assert Janus.any_authorized?(Thread, :read, policy)
+      refute Janus.any_authorized?(Thread, :edit, policy)
+      refute Janus.any_authorized?(Post, :read, policy)
+    end
+
+    test "should return false if a blanket forbid exists without an always_allow" do
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Thread)
+        |> forbid(:read, Thread)
+
+      refute Janus.any_authorized?(Thread, :read, policy)
+
+      policy =
+        %Janus.Policy{}
+        |> forbid(:read, Thread)
+        |> allow(:read, Thread)
+
+      refute Janus.any_authorized?(Thread, :read, policy)
+    end
+
+    test "should return true if an always_allow exists" do
+      policy =
+        %Janus.Policy{}
+        |> forbid(:read, Thread)
+        |> always_allow(:read, Thread)
+
+      assert Janus.any_authorized?(Thread, :read, policy)
+    end
+
+    test "should return true if a forbid is conditional on attribute match" do
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Thread)
+        |> forbid(:read, Thread, where: [archived: true])
+
+      assert Janus.any_authorized?(Thread, :read, policy)
     end
   end
 
