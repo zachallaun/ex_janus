@@ -12,7 +12,7 @@ defmodule JanusTest do
 
   describe "policy module" do
     defmodule ExamplePolicy do
-      use Janus
+      use Janus.Policy
 
       @impl true
       def policy_for(policy \\ %Janus.Policy{}, _) do

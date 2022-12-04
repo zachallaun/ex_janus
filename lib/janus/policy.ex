@@ -1,47 +1,3 @@
-defmodule Janus.Policy.Rule do
-  @moduledoc """
-  Struct containing the authorization data for a struct and action.
-  """
-
-  @type t :: %__MODULE__{
-          schema: Janus.schema(),
-          action: Janus.action(),
-          allow: [keyword()],
-          forbid: [keyword()],
-          always_allow: [keyword()]
-        }
-
-  defstruct [
-    :schema,
-    :action,
-    allow: [],
-    forbid: [],
-    always_allow: []
-  ]
-
-  @doc false
-  def new(schema, action) do
-    %__MODULE__{schema: schema, action: action}
-  end
-
-  @doc false
-  def allow(rule, opts) do
-    if [] in rule.forbid do
-      rule
-    else
-      Map.update(rule, :allow, [opts], &[opts | &1])
-    end
-  end
-
-  @doc false
-  def forbid(rule, []), do: Map.merge(rule, %{allow: [], forbid: [[]]})
-  def forbid(rule, opts), do: Map.update(rule, :forbid, [opts], &[opts | &1])
-
-  @doc false
-  def always_allow(rule, []), do: Map.merge(rule, %{allow: [], forbid: [], always_allow: [[]]})
-  def always_allow(rule, opts), do: Map.update(rule, :always_allow, [opts], &[opts | &1])
-end
-
 defmodule Janus.Policy do
   @moduledoc """
   TODO
@@ -71,7 +27,61 @@ defmodule Janus.Policy do
 
   defstruct rules: %{}
 
-  @callback policy_for(t, actor :: any()) :: t
+  @callback policy_for(t, actor :: Janus.actor()) :: t
+
+  @doc false
+  defmacro __using__(_opts) do
+    quote do
+      @behaviour Janus.Policy
+      require Janus
+      import Janus.Policy, except: [rule_for: 3]
+
+      unquote(default_using())
+
+      @doc "See `Janus.authorize/4`"
+      def authorize(object, action, actor, opts \\ []) do
+        Janus.authorize(object, action, __policy_for__(actor), opts)
+      end
+
+      @doc "See `Janus.any_authorized?/3`"
+      def any_authorized?(schema, action, actor) do
+        Janus.any_authorized?(schema, action, __policy_for__(actor))
+      end
+
+      @doc "See `Janus.authorized/4`"
+      defmacro authorized(query_or_schema, action, actor, opts \\ []) do
+        quote do
+          require Janus
+
+          Janus.authorized(
+            unquote(query_or_schema),
+            unquote(action),
+            unquote(__MODULE__).__policy_for__(unquote(actor)),
+            unquote(opts)
+          )
+        end
+      end
+
+      def __policy_for__(%Janus.Policy{} = policy), do: policy
+      def __policy_for__(actor), do: policy_for(actor)
+    end
+  end
+
+  defp default_using do
+    quote unquote: false do
+      @doc false
+      defmacro __using__(_opts) do
+        quote do
+          require unquote(__MODULE__)
+
+          import unquote(__MODULE__),
+            only: [authorize: 3, authorize: 4, authorized: 3, authorized: 4]
+        end
+      end
+
+      defoverridable __using__: 1
+    end
+  end
 
   @doc "TODO"
   @spec allow(t, Janus.action(), Janus.schema(), keyword()) :: t

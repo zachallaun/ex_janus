@@ -78,7 +78,7 @@ Here's what a basic policy module might look like:
 
 ```elixir
 defmodule Discoarse.Policy do
-  use Janus
+  use Janus.Policy
 
   alias Discoarse.Accounts
   alias Discoarse.Forum
@@ -154,7 +154,7 @@ If better encapsulation is desired, policies could be defined per-context and co
 
 ```elixir
 defmodule Discoarse.Policy do
-  use Janus
+  use Janus.Policy
 
   @impl true
   def policy_for(policy \\ %Janus.Policy{}, actor) do
@@ -172,7 +172,7 @@ Now that we've defined a policy, we can use it for two main purposes:
 
 Auth/permissions checks are done with `Janus.authorize/4`.
 Data loading is done with `Janus.authorized/4`, which returns an `Ecto.Query`.
-(Note that `use Janus` defined these functions on our policy module as well.)
+(Note that `use Janus.Policy` defined these functions on our policy module as well.)
 
 ```elixir
 import Ecto.Query

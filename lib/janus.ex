@@ -7,65 +7,9 @@ defmodule Janus do
 
   require Ecto.Query
 
-  @type action :: atom()
+  @type action :: any()
   @type schema :: atom()
   @type actor :: any()
-
-  @callback policy_for(policy :: Janus.Policy.t(), actor) :: Janus.Policy.t()
-
-  @doc false
-  defmacro __using__(_opts) do
-    quote do
-      @behaviour Janus
-      require Janus
-      import Janus.Policy, except: [rule_for: 3]
-
-      unquote(default_using())
-
-      @doc "See `Janus.authorize/4`"
-      def authorize(object, action, actor, opts \\ []) do
-        Janus.authorize(object, action, __policy_for__(actor), opts)
-      end
-
-      @doc "See `Janus.any_authorized?/3`"
-      def any_authorized?(schema, action, actor) do
-        Janus.any_authorized?(schema, action, __policy_for__(actor))
-      end
-
-      @doc "See `Janus.authorized/4`"
-      defmacro authorized(query_or_schema, action, actor, opts \\ []) do
-        quote do
-          require Janus
-
-          Janus.authorized(
-            unquote(query_or_schema),
-            unquote(action),
-            unquote(__MODULE__).__policy_for__(unquote(actor)),
-            unquote(opts)
-          )
-        end
-      end
-
-      def __policy_for__(%Janus.Policy{} = policy), do: policy
-      def __policy_for__(actor), do: policy_for(actor)
-    end
-  end
-
-  defp default_using do
-    quote unquote: false do
-      @doc false
-      defmacro __using__(_opts) do
-        quote do
-          require unquote(__MODULE__)
-
-          import unquote(__MODULE__),
-            only: [authorize: 3, authorize: 4, authorized: 3, authorized: 4]
-        end
-      end
-
-      defoverridable __using__: 1
-    end
-  end
 
   @doc """
   Authorize that the given `action` is allowed for `object` based on `policy`.
