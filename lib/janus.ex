@@ -103,7 +103,9 @@ defmodule Janus do
   is not authorized to see any elements of the resource, but it may not be possible to
   differentiate between that and there just happening to be no records that match.
   """
-  def any_authorized?(schema, action, policy) when is_atom(schema) do
+  def any_authorized?(schema_or_query, action, policy) do
+    {_query, schema} = Janus.Utils.resolve_query_and_schema!(schema_or_query)
+
     case Janus.Policy.rule_for(policy, action, schema) do
       %{allow: [], always_allow: []} -> false
       %{always_allow: [_ | _]} -> true

@@ -52,7 +52,7 @@ defmodule Janus.Filter do
   Note that opts must have been processed using `prep_opts/1` at macro time.
   """
   def filter(query_or_schema, action, policy, opts \\ []) do
-    {query, schema} = derive_query_and_schema(query_or_schema)
+    {query, schema} = Janus.Utils.resolve_query_and_schema!(query_or_schema)
     rule = Janus.Policy.rule_for(policy, action, schema)
 
     %Janus.Filter{
@@ -104,33 +104,6 @@ defmodule Janus.Filter do
       end
 
     opts
-  end
-
-  defp derive_query_and_schema(%Ecto.Query{} = query) do
-    {_, schema} = derive_query_and_schema(query.from.source)
-    {query, schema}
-  end
-
-  defp derive_query_and_schema(%Ecto.SubQuery{query: query} = subquery) do
-    {_, schema} = derive_query_and_schema(query)
-    {Ecto.Query.subquery(subquery), schema}
-  end
-
-  defp derive_query_and_schema({%Ecto.Query{} = query, schema}) do
-    {_, schema} = derive_query_and_schema(schema)
-    {query, schema}
-  end
-
-  defp derive_query_and_schema({_, schema}) do
-    derive_query_and_schema(schema)
-  end
-
-  defp derive_query_and_schema(schema) when is_atom(schema) and not is_nil(schema) do
-    {schema, schema}
-  end
-
-  defp derive_query_and_schema(_) do
-    raise "filter/4 requires a schema or a query with a schema as its source"
   end
 
   defp filter_or_where(filter, []), do: filter

@@ -125,6 +125,13 @@ defmodule JanusTest do
 
       assert Janus.any_authorized?(Thread, :read, policy)
     end
+
+    test "should accept a query as first argument" do
+      policy = %Janus.Policy{}
+      query = Ecto.Query.order_by(Thread, desc: :inserted_at)
+
+      refute Janus.any_authorized?(query, :read, policy)
+    end
   end
 
   describe "blanket permissions" do
