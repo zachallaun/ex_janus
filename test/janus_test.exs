@@ -15,7 +15,7 @@ defmodule JanusTest do
       use Janus.Policy
 
       @impl true
-      def policy_for(policy \\ %Janus.Policy{}, _) do
+      def policy_for(policy, _) do
         policy
         |> allow(:read, Thread)
         |> forbid(:read, Thread)

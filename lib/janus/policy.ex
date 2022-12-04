@@ -63,7 +63,7 @@ defmodule Janus.Policy do
       end
 
       def __policy_for__(%Janus.Policy{} = policy), do: policy
-      def __policy_for__(actor), do: policy_for(actor)
+      def __policy_for__(actor), do: policy_for(%Janus.Policy{}, actor)
     end
   end
 
