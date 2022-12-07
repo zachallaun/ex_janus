@@ -30,7 +30,7 @@ defmodule Janus.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:ecto, "~> 3.9"},
+      {:ecto, github: "zachallaun/ecto", ref: "preload-dynamic", override: true},
       {:ecto_sql, "~> 3.9", only: [:test, :dev]},
       {:postgrex, "~> 0.16", only: :test},
       {:jason, "~> 1.4", only: :test}

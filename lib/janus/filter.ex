@@ -43,7 +43,7 @@ defmodule Janus.Filter do
 
     from(initial_query, as: ^binding, where: ^dynamic)
     |> with_joins(joins)
-    |> with_preload_authorized(filter, opts[:preload_authorized], opts[:__apply_preload__])
+    |> with_preload_authorized(filter, opts[:preload_authorized])
   end
 
   @doc """
@@ -66,44 +66,6 @@ defmodule Janus.Filter do
     |> filter_and_where_not(rule.forbid)
     |> filter_or_where(rule.always_allow)
     |> to_query(Keyword.put(opts, :query, query))
-  end
-
-  @doc """
-  Prepare filter options.
-
-  Required to be run at macro time in order to generate bindings, etc. that are required
-  by Ecto macros.
-  """
-  def prep_opts(opts \\ []) do
-    unless Keyword.keyword?(opts) do
-      raise "options must be a keyword list, got: #{inspect(opts)}"
-    end
-
-    opts =
-      if p = opts[:preload_authorized] do
-        preload_expr =
-          quote do
-            fn query ->
-              require Ecto.Query
-
-              Ecto.Query.preload(
-                query,
-                unquote(preload_bindings(p)),
-                unquote(preload_opt(p))
-              )
-            end
-          end
-
-        Keyword.put(
-          opts,
-          :__apply_preload__,
-          preload_expr
-        )
-      else
-        opts
-      end
-
-    opts
   end
 
   defp filter_or_where(filter, []), do: filter
@@ -258,10 +220,10 @@ defmodule Janus.Filter do
   defp simplify_or(clause, false), do: clause
   defp simplify_or(clause1, clause2), do: dynamic(^clause1 or ^clause2)
 
-  defp with_preload_authorized(query, _filter, nil, nil), do: query
+  defp with_preload_authorized(query, _filter, nil), do: query
 
-  defp with_preload_authorized(query, filter, preload_opt, apply_preload) do
-    preloads = calc_preloads(preload_opt, filter.schema, filter.binding, filter)
+  defp with_preload_authorized(query, filter, preload_opt) do
+    {preloads, preload_opt} = calc_preloads(preload_opt, filter.schema, filter.binding, filter)
 
     query =
       for preload <- preloads, reduce: query do
@@ -293,45 +255,7 @@ defmodule Janus.Filter do
           )
       end
 
-    apply_preload.(query)
-  end
-
-  # Generate flat list of quoted bindings to pass to preload
-  # e.g. Given [foo: :bar] ->
-  #      preload(query, [foo: foo, bar: bar], ...)
-  defp preload_bindings(preloads) do
-    preloads
-    |> List.wrap()
-    |> Enum.flat_map(fn
-      preload when is_atom(preload) ->
-        [preload_binding(preload)]
-
-      {preload, preloads} ->
-        [preload_binding(preload) | preload_bindings(preloads)]
-
-      preloads when is_list(preloads) ->
-        Enum.map(preloads, &preload_bindings/1)
-    end)
-  end
-
-  defp preload_binding(preload) when is_atom(preload) do
-    {preload, Macro.var(preload, __MODULE__)}
-  end
-
-  # Generate nested kw list to pass to preload
-  # e.g. Given [foo: :bar]
-  #      preload(query, ..., [foo: {foo, bar: bar}])
-  defp preload_opt(preload) when is_atom(preload) do
-    [{preload, Macro.var(preload, __MODULE__)}]
-  end
-
-  defp preload_opt({preload, preloads}) do
-    [{preload, binding}] = preload_opt(preload)
-    [{preload, {binding, preload_opt(preloads)}}]
-  end
-
-  defp preload_opt(preloads) when is_list(preloads) do
-    Enum.flat_map(preloads, &preload_opt/1)
+    from(query, preload: ^preload_opt)
   end
 
   defp calc_preloads(assoc, schema, binding, filter) when is_atom(assoc) do
@@ -346,19 +270,24 @@ defmodule Janus.Filter do
       related_key: association.related_key
     }
 
-    [preload]
+    {[preload], [{assoc, dynamic([{^assoc, a}], a)}]}
   end
 
-  defp calc_preloads({assoc, rest}, schema, binding, filter) do
-    association = schema.__schema__(:association, assoc)
+  defp calc_preloads({assoc, rest}, schema, binding, filter) when is_atom(assoc) do
+    related_schema = schema.__schema__(:association, assoc).related
 
-    calc_preloads(assoc, schema, binding, filter) ++
-      calc_preloads(rest, association.related, assoc, filter)
+    {preloads, [{assoc, dynamic}]} = calc_preloads(assoc, schema, binding, filter)
+    {rest_preloads, rest_preload_opt} = calc_preloads(rest, related_schema, assoc, filter)
+
+    {preloads ++ rest_preloads, [{assoc, {dynamic, rest_preload_opt}}]}
   end
 
   defp calc_preloads(preloads, schema, binding, filter) when is_list(preloads) do
-    Enum.flat_map(preloads, fn preload ->
-      calc_preloads(preload, schema, binding, filter)
-    end)
+    {preloads, preload_opts} =
+      preloads
+      |> Enum.map(&calc_preloads(&1, schema, binding, filter))
+      |> Enum.unzip()
+
+    {Enum.concat(preloads), Enum.concat(preload_opts)}
   end
 end

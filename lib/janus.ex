@@ -122,14 +122,7 @@ defmodule Janus do
   * `:preload_authorized` - preload associated resources on the result, but filtered to
     those that are allowed based on the action and policy.
   """
-  defmacro authorized(query_or_schema, action, policy, opts \\ []) do
-    quote bind_quoted: [
-            query_or_schema: query_or_schema,
-            action: action,
-            policy: policy,
-            opts: Janus.Filter.prep_opts(opts)
-          ] do
-      Janus.Filter.filter(query_or_schema, action, policy, opts)
-    end
+  def authorized(query_or_schema, action, policy, opts \\ []) do
+    Janus.Filter.filter(query_or_schema, action, policy, opts)
   end
 end

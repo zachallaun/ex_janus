@@ -53,17 +53,8 @@ defmodule Janus.Policy do
       end
 
       @doc "See `Janus.authorized/4`"
-      defmacro authorized(query_or_schema, action, actor, opts \\ []) do
-        quote do
-          require Janus
-
-          Janus.authorized(
-            unquote(query_or_schema),
-            unquote(action),
-            unquote(__MODULE__).policy_for(unquote(actor)),
-            unquote(opts)
-          )
-        end
+      def authorized(query_or_schema, action, actor, opts \\ []) do
+        Janus.authorized(query_or_schema, action, policy_for(actor), opts)
       end
     end
   end
