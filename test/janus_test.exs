@@ -8,7 +8,7 @@ defmodule JanusTest do
   import JanusTest.Fixtures
 
   alias JanusTest.Schemas.{Thread, Post, User}, warn: false
-  alias JanusTest.Repo
+  alias JanusTest.{Forum, Repo}
 
   describe "policy module" do
     defmodule ExamplePolicy do
@@ -373,6 +373,35 @@ defmodule JanusTest do
       assert [
                %Post{thread: %Thread{posts: [%Post{}]}},
                %Post{thread: %Thread{posts: [%Post{}]}}
+             ] = query |> Repo.all()
+    end
+
+    test ":preload_authorized should accept queries to be applied to each nested assoc" do
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Thread, where: [archived: false])
+        |> allow(:read, Post, where: [archived: false, thread: allows(:read)])
+
+      [t1, t2, t3] = for _ <- 1..3, do: thread_fixture()
+
+      _ = t3 |> Thread.changeset(%{archived: true}) |> Repo.update!()
+      {:ok, _} = Forum.create_post(t1.creator, t1, "post")
+      {:ok, _} = Forum.create_post(t2.creator, t2, "post")
+      {:ok, _} = Forum.create_post(t3.creator, t3, "non-visible post")
+
+      first_post_query = Ecto.Query.from(Post, order_by: :id, limit: 1)
+
+      query =
+        Janus.filter_authorized(Thread, :read, policy,
+          preload_authorized: [posts: first_post_query]
+        )
+
+      %{posts: [%{id: p1_id}]} = t1
+      %{posts: [%{id: p2_id}]} = t2
+
+      assert [
+               %Thread{posts: [%{id: ^p1_id}]},
+               %Thread{posts: [%{id: ^p2_id}]}
              ] = query |> Repo.all()
     end
   end

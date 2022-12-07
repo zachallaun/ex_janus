@@ -259,27 +259,21 @@ defmodule Janus.Filter do
   end
 
   defp calc_preloads(assoc, schema, binding, filter) when is_atom(assoc) do
-    association = schema.__schema__(:association, assoc)
-
-    preload = %{
-      assoc: assoc,
-      owner_as: binding,
-      owner_key: association.owner_key,
-      related_query: filter(association.queryable, filter.action, filter.policy),
-      related_as: assoc,
-      related_key: association.related_key
-    }
-
-    {[preload], [{assoc, dynamic([{^assoc, a}], a)}]}
+    {preload, preload_opt} = preload_spec(assoc, schema, binding, filter)
+    {[preload], preload_opt}
   end
 
-  defp calc_preloads({assoc, rest}, schema, binding, filter) when is_atom(assoc) do
-    related_schema = schema.__schema__(:association, assoc).related
+  defp calc_preloads({assoc, %Ecto.Query{} = query}, schema, binding, filter) do
+    {preload, preload_opt} = preload_spec(assoc, schema, binding, filter, query)
+    {[preload], preload_opt}
+  end
 
-    {preloads, [{assoc, dynamic}]} = calc_preloads(assoc, schema, binding, filter)
-    {rest_preloads, rest_preload_opt} = calc_preloads(rest, related_schema, assoc, filter)
+  defp calc_preloads({assoc, {%Ecto.Query{} = query, rest}}, schema, binding, filter) do
+    nested_preload_spec({assoc, rest}, schema, binding, filter, query)
+  end
 
-    {preloads ++ rest_preloads, [{assoc, {dynamic, rest_preload_opt}}]}
+  defp calc_preloads({assoc, rest}, schema, binding, filter) do
+    nested_preload_spec({assoc, rest}, schema, binding, filter, nil)
   end
 
   defp calc_preloads(preloads, schema, binding, filter) when is_list(preloads) do
@@ -289,5 +283,30 @@ defmodule Janus.Filter do
       |> Enum.unzip()
 
     {Enum.concat(preloads), Enum.concat(preload_opts)}
+  end
+
+  defp nested_preload_spec({assoc, rest}, schema, binding, filter, related_query) do
+    related_schema = schema.__schema__(:association, assoc).related
+
+    {preload, [{assoc, dynamic}]} = preload_spec(assoc, schema, binding, filter, related_query)
+    {rest_preloads, rest_preload_opt} = calc_preloads(rest, related_schema, assoc, filter)
+
+    {[preload | rest_preloads], [{assoc, {dynamic, rest_preload_opt}}]}
+  end
+
+  defp preload_spec(assoc, schema, binding, filter, related_query \\ nil) do
+    association = schema.__schema__(:association, assoc)
+    related_query = related_query || association.queryable
+
+    preload = %{
+      assoc: assoc,
+      owner_as: binding,
+      owner_key: association.owner_key,
+      related_query: filter(related_query, filter.action, filter.policy),
+      related_as: assoc,
+      related_key: association.related_key
+    }
+
+    {preload, [{assoc, dynamic([{^assoc, a}], a)}]}
   end
 end
