@@ -42,10 +42,10 @@ The API is intentionally minimal and is exposed by your policy module.
 true = MyPolicy.any_authorized?(ResourceSchema, :some_action, some_user)
 
 # Query resources that can have an action performed by some actor
-%Ecto.Query{} = MyPolicy.authorized(ResourceSchema, :some_action, some_user)
+%Ecto.Query{} = MyPolicy.filter_authorized(ResourceSchema, :some_action, some_user)
 ```
 
-For more, see the documentation for `authorize/4` and `authorized/4`.
+For more, see the documentation for `authorize/4` and `filter_authorized/4`.
 
 ## Policy Modules
 
@@ -171,14 +171,14 @@ Now that we've defined a policy, we can use it for two main purposes:
 2. data loading (fetch all the _things_ that the actor can do _this_ to).
 
 Auth/permissions checks are done with `Janus.authorize/4`.
-Data loading is done with `Janus.authorized/4`, which returns an `Ecto.Query`.
+Data loading is done with `Janus.filter_authorized/4`, which returns an `Ecto.Query`.
 (Note that `use Janus.Policy` defined these functions on our policy module as well.)
 
 ```elixir
 import Ecto.Query
 alias Discoarse.{Forum, Repo}
 
-# Imports `authorize/4` and `authorized/4`.
+# Imports `authorize/4` and `filter_authorized/4`.
 use Discoarse.Policy
 
 # Authorize individual resources
@@ -189,10 +189,10 @@ use Discoarse.Policy
 # Filter a query to those that are authorized
 Forum.Thread
 |> order_by(desc: :inserted_at)
-|> authorized(:edit, user)
+|> filter_authorized(:edit, user)
 |> Repo.all()
 
-authorized(Forum.Thread, :edit, user)
+filter_authorized(Forum.Thread, :edit, user)
 ```
 
 

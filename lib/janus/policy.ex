@@ -29,6 +29,17 @@ defmodule Janus.Policy do
 
   @callback policy_for(t, actor :: Janus.actor()) :: t
 
+  @callback authorize(any(), Janus.action(), Janus.actor(), keyword()) :: {:ok, any()} | :error
+
+  @callback any_authorized?(Janus.schema(), Janus.action(), Janus.actor()) :: boolean()
+
+  @callback filter_authorized(
+              Ecto.Query.t() | Janus.schema(),
+              Janus.action(),
+              Janus.actor(),
+              keyword()
+            ) :: Ecto.Query.t()
+
   @doc false
   defmacro __using__(_opts) do
     quote do
@@ -43,18 +54,21 @@ defmodule Janus.Policy do
       def policy_for(actor), do: policy_for(%Janus.Policy{}, actor)
 
       @doc "See `Janus.authorize/4`"
+      @impl true
       def authorize(object, action, actor, opts \\ []) do
         Janus.authorize(object, action, policy_for(actor), opts)
       end
 
       @doc "See `Janus.any_authorized?/3`"
+      @impl true
       def any_authorized?(schema, action, actor) do
         Janus.any_authorized?(schema, action, policy_for(actor))
       end
 
-      @doc "See `Janus.authorized/4`"
-      def authorized(query_or_schema, action, actor, opts \\ []) do
-        Janus.authorized(query_or_schema, action, policy_for(actor), opts)
+      @doc "See `Janus.filter_authorized/4`"
+      @impl true
+      def filter_authorized(query_or_schema, action, actor, opts \\ []) do
+        Janus.filter_authorized(query_or_schema, action, policy_for(actor), opts)
       end
     end
   end
@@ -67,7 +81,13 @@ defmodule Janus.Policy do
           require unquote(__MODULE__)
 
           import unquote(__MODULE__),
-            only: [authorize: 3, authorize: 4, authorized: 3, authorized: 4]
+            only: [
+              authorize: 3,
+              authorize: 4,
+              any_authorized?: 3,
+              filter_authorized: 3,
+              filter_authorized: 4
+            ]
         end
       end
 

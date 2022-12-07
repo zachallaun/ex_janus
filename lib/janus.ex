@@ -122,7 +122,7 @@ defmodule Janus do
   * `:preload_authorized` - preload associated resources on the result, but filtered to
     those that are allowed based on the action and policy.
   """
-  def authorized(query_or_schema, action, policy, opts \\ []) do
+  def filter_authorized(query_or_schema, action, policy, opts \\ []) do
     Janus.Filter.filter(query_or_schema, action, policy, opts)
   end
 end
