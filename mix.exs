@@ -43,6 +43,7 @@ defmodule Janus.MixProject do
   defp aliases do
     [
       "ecto.setup": [
+        "ecto.drop",
         "ecto.create",
         "ecto.migrate --migrations-path test/support/janus_test/migrations"
       ]
