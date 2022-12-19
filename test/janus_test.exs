@@ -10,7 +10,7 @@ defmodule JanusTest do
   alias JanusTest.Schemas.{Thread, Post, User}, warn: false
   alias JanusTest.{Forum, Repo}
 
-  describe "policy module" do
+  describe "basic policy module" do
     defmodule ExamplePolicy do
       use Janus.Policy
 
@@ -60,6 +60,72 @@ defmodule JanusTest do
 
       assert {:ok, ^t} = authorize(t, :read, :user)
       assert [%Thread{}] = filter_authorized(Thread, :read, :user) |> Repo.all()
+    end
+  end
+
+  describe "policy module with hooks" do
+    defmodule ExamplePolicyWithHooks do
+      use Janus.Policy
+
+      before_policy_for :wrap_if_1
+      before_policy_for :halt_if_2
+      before_policy_for :shouldnt_run_after_halt_if_2
+      before_policy_for :invalid_if_3
+
+      @impl true
+      def before_policy_for(hook, policy, actor)
+
+      def before_policy_for(:wrap_if_1, policy, 1) do
+        {:cont, policy, {:wrapped, 1}}
+      end
+
+      def before_policy_for(:wrap_if_1, policy, actor), do: {:cont, policy, actor}
+
+      def before_policy_for(:halt_if_2, policy, 2) do
+        {:halt, policy}
+      end
+
+      def before_policy_for(:halt_if_2, policy, actor), do: {:cont, policy, actor}
+
+      def before_policy_for(:shouldnt_run_after_halt_if_2, policy, 2) do
+        send(self(), :shouldnt_run_after_halt_if_2)
+        {:cont, policy, 2}
+      end
+
+      def before_policy_for(:shouldnt_run_after_halt_if_2, policy, actor) do
+        {:cont, policy, actor}
+      end
+
+      def before_policy_for(:invalid_if_3, _policy, 3) do
+        :invalid
+      end
+
+      def before_policy_for(:invalid_if_3, policy, actor), do: {:cont, policy, actor}
+
+      @impl true
+      def policy_for(policy, actor) do
+        send(self(), {:policy_for, policy, actor})
+        policy
+      end
+    end
+
+    test "should continue with modified policy/actor if :cont tuple returned" do
+      assert %Janus.Policy{} = ExamplePolicyWithHooks.policy_for(1)
+      assert_received {:policy_for, %Janus.Policy{}, {:wrapped, 1}}
+    end
+
+    test "shouldn't run later hooks or policy_for if :halt tuple returned" do
+      assert %Janus.Policy{} = ExamplePolicyWithHooks.policy_for(2)
+      refute_received :shouldnt_run_after_halt_if_2
+      refute_received {:policy_for, _, _}
+    end
+
+    test "raises on invalid return from hook" do
+      message = ~r"invalid return from hook `:invalid_if_3`"
+
+      assert_raise(ArgumentError, message, fn ->
+        ExamplePolicyWithHooks.policy_for(3)
+      end)
     end
   end
 

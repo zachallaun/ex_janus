@@ -27,7 +27,10 @@ defmodule Janus.Policy do
 
   defstruct rules: %{}
 
-  @callback policy_for(t, actor :: Janus.actor()) :: t
+  @callback policy_for(t, Janus.actor()) :: t
+
+  @callback before_policy_for(any(), t, Janus.actor()) ::
+              {:cont, t, Janus.actor()} | {:halt, t, Janus.actor()}
 
   @callback authorize(any(), Janus.action(), Janus.actor(), keyword()) :: {:ok, any()} | :error
 
@@ -40,10 +43,17 @@ defmodule Janus.Policy do
               keyword()
             ) :: Ecto.Query.t()
 
+  @optional_callbacks before_policy_for: 3
+
+  @janus_hooks :__janus_hooks__
+
   @doc false
   defmacro __using__(_opts) do
-    quote do
+    quote location: :keep do
       @behaviour Janus.Policy
+      @before_compile Janus.Policy
+      Module.register_attribute(__MODULE__, unquote(@janus_hooks), accumulate: true)
+
       require Janus
       import Janus.Policy, except: [rule_for: 3]
 
@@ -92,6 +102,58 @@ defmodule Janus.Policy do
       end
 
       defoverridable __using__: 1
+    end
+  end
+
+  @doc false
+  defmacro __before_compile__(env) do
+    hooks =
+      env.module
+      |> Module.get_attribute(@janus_hooks)
+      |> Enum.reverse()
+
+    if hooks != [] do
+      quote location: :keep do
+        defoverridable policy_for: 2
+
+        def policy_for(policy, actor) do
+          case Janus.Policy.run_hooks(unquote(hooks), policy, actor, __MODULE__) do
+            {:cont, policy, actor} -> super(policy, actor)
+            {:halt, policy} -> policy
+          end
+        end
+      end
+    end
+  end
+
+  @doc false
+  def run_hooks([hook | hooks], policy, actor, module) do
+    case module.before_policy_for(hook, policy, actor) do
+      {:cont, %Janus.Policy{} = policy, actor} -> run_hooks(hooks, policy, actor, module)
+      {:halt, %Janus.Policy{} = policy} -> {:halt, policy}
+      other -> bad_hook_result!(other, hook)
+    end
+  end
+
+  def run_hooks([], policy, actor, _module), do: {:cont, policy, actor}
+
+  defp bad_hook_result!(result, hook) do
+    raise ArgumentError, """
+    invalid return from hook `#{inspect(hook)}`. Expected one of:
+
+        {:cont, %Janus.Policy{}, actor}
+        {:halt, %Janus.Policy{}}
+
+    Got: #{inspect(result)}
+    """
+  end
+
+  @doc """
+  Registers a hook to be run prior to calling `policy_for/2`.
+  """
+  defmacro before_policy_for(hook) do
+    quote do
+      Module.put_attribute(__MODULE__, unquote(@janus_hooks), unquote(hook))
     end
   end
 
