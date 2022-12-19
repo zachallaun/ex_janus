@@ -1,5 +1,7 @@
 defmodule Janus.Policy.Rule do
-  @moduledoc false
+  @moduledoc """
+  Defines a rule for an individual schema and action.
+  """
 
   @type t :: %__MODULE__{
           schema: Janus.schema(),

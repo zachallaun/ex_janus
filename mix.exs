@@ -1,10 +1,13 @@
 defmodule Janus.MixProject do
   use Mix.Project
 
+  @source_url "https://github.com/zachallaun/janus"
+  @version "0.1.0-dev"
+
   def project do
     [
       app: :janus,
-      version: "0.1.0",
+      version: @version,
       elixir: "~> 1.14",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -16,7 +19,15 @@ defmodule Janus.MixProject do
         "ecto.migrate": :test,
         "ecto.rollback": :test,
         "ecto.create": :test
-      ]
+      ],
+
+      # Hex
+      description: "Authorization for Ecto schemas",
+      package: package(),
+
+      # Docs
+      name: "Janus",
+      docs: docs()
     ]
   end
 
@@ -33,7 +44,8 @@ defmodule Janus.MixProject do
       {:ecto, github: "elixir-ecto/ecto", override: true},
       {:ecto_sql, "~> 3.9", only: [:test, :dev]},
       {:postgrex, "~> 0.16", only: :test},
-      {:jason, "~> 1.4", only: :test}
+      {:jason, "~> 1.4", only: :test},
+      {:ex_doc, only: :dev, runtime: false}
     ]
   end
 
@@ -46,6 +58,28 @@ defmodule Janus.MixProject do
         "ecto.drop",
         "ecto.create",
         "ecto.migrate --migrations-path test/support/janus_test/migrations"
+      ]
+    ]
+  end
+
+  defp package do
+    [
+      licenses: ["MIT"],
+      links: %{"GitHub" => @source_url},
+      files: ~w(.formatter.exs mix.exs README.md lib priv)
+    ]
+  end
+
+  defp docs do
+    [
+      main: "Janus",
+      source_url: @source_url,
+      extra_section: "GUIDES",
+      extras: [
+        "cheatsheets/defining_policies.cheatmd"
+      ],
+      groups_for_extras: [
+        Cheatsheets: ~r/cheatsheets\/.?/
       ]
     ]
   end

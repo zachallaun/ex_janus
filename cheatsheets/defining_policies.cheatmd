@@ -1,0 +1,174 @@
+# Defining policies
+
+This cheatsheet references a hypothetical message board with three primary resources: posts, which have many comments, both of which are created by users.
+
+## Example Schemas
+{: .col-3}
+
+### User
+
+```elixir
+defmodule User do
+  use Ecto.Schema
+
+  schema "users" do
+    field :email, :string
+    field :display_name, :string
+
+    field :role, Ecto.Enum,
+      values: [:member, :moderator, :admin]
+
+    has_many :posts, Post
+    has_many :comments, Comment
+  end
+end
+```
+
+### Post
+
+```elixir
+defmodule Post do
+  use Ecto.Schema
+
+  schema "posts" do
+    field :title, :string
+    field :content, :string
+
+    field :archived, :boolean,
+      default: false
+
+    belongs_to :user, User
+    has_many :comments, Comment
+  end
+end
+```
+
+### Comment
+
+```elixir
+defmodule Comment do
+  use Ecto.Schema
+
+  schema "comments" do
+    field :content, :string
+
+    belongs_to :user, User
+    belongs_to :post, Post
+  end
+end
+```
+
+## In the `policy_for/2` callback
+{: .col-2}
+
+### Blanket permissions
+
+#### Unconditional access for admin
+
+```elixir
+def policy_for(policy, %User{role: :admin}) do
+  policy
+  |> allow(:read, Post)
+  |> allow(:edit, Post)
+  |> allow(:archive, Post)
+  |> allow(:read, Comment)
+  |> allow(:edit, Comment)
+end
+```
+
+#### Can also use lists of actions
+
+```elixir
+def policy_for(policy, %User{role: :admin}) do
+  policy
+  |> allow([:read, :edit, :archive], Post)
+  |> allow([:read, :edit], Comment)
+end
+```
+
+### Permissions based on attributes
+
+#### Members can read all unarchived posts
+
+```elixir
+def policy_for(policy, %User{role: :member} = user) do
+  policy
+  |> allow(:read, Post, where: [archived: false])
+
+  # or define using :where_not
+  |> allow(:read, Post, where_not: [archived: true])
+
+  # or override a blanket permission using forbid
+  |> allow(:read, Post)
+  |> forbid(:read, Post, where: [archived: true])
+end
+```
+
+### Permissions based on associations
+
+#### Members can edit their own comments
+
+```elixir
+def policy_for(policy, %User{role: :member} = user) do
+  policy
+  |> allow(:edit, Comment, where: [user: [id: user.id]])
+end
+```
+
+#### Moderators can edit comments made by members
+
+```elixir
+def policy_for(policy, %User{role: :moderator} = user) do
+  policy
+  |> allow(:edit, Comment, where: [user: [role: :member]])
+end
+```
+
+#### Members can read comments if they can read the associated post
+
+```elixir
+def policy_for(policy, %User{role: :member} = user) do
+  policy
+  |> allow(:read, Post, where: [archived: false])
+  |> allow(:read, Comment, where: [post: allows(:read)])
+end
+```
+
+Note: using `Janus.Policy.allows/1` lets you delegate to permissions defined elsewhere without having to duplicate them.
+
+### Multiple rules for the same action/schema
+
+#### Multiple `allow` combines as an "or"
+
+```elixir
+# This will always let the user read all posts since
+# the first `allow` combines as an "or" clause with
+# the second.
+def policy_for(policy, %User{role: :member} = user) do
+  policy
+  |> allow(:read, Post)
+  |> allow(:read, Post, where: [archived: false]) # has no effect
+end
+```
+
+#### Use `forbid` to override a previous `allow`
+
+```elixir
+def policy_for(policy, %User{role: :member} = user) do
+  policy
+  |> allow(:read, Post)
+  |> forbid(:read, Post, where: [archived: true])
+end
+```
+
+### Defining actions as strings
+
+You can use atoms or strings to represent actions. Strings may be useful if allowed actions are stored in an array or map in your database.
+
+```elixir
+def policy_for(policy, %User{role: :moderator}) do
+  policy
+  |> allow("read", Post)
+  |> allow("archive", Post, where: [user: [role: :member]])
+end
+```
