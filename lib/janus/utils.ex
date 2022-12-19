@@ -22,7 +22,7 @@ defmodule Janus.Utils do
   end
 
   def resolve_query_and_schema!(query_or_schema) do
-    raise "could not resolve query and schema from #{inspect(query_or_schema)}"
+    raise ArgumentError, "could not resolve query and schema from #{inspect(query_or_schema)}"
   end
 
   defp resolve_schema!(%Ecto.Query{from: from}), do: resolve_schema!(from.source)

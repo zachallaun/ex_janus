@@ -167,7 +167,7 @@ defmodule Janus.Filter do
   end
 
   defp dynamic_compare(_filter, _field, fun) when is_function(fun) do
-    raise "permission functions must have arity 3 (#{inspect(fun)})"
+    raise ArgumentError, "permission functions must have arity 3 (#{inspect(fun)})"
   end
 
   defp dynamic_compare(filter, field, value) do
@@ -180,7 +180,7 @@ defmodule Janus.Filter do
   defp dump!(type_info, value) do
     case dump(type_info, value) do
       {:ok, dumped} -> dumped
-      _ -> raise "could not dump #{inspect(value)} to type #{inspect(type_info)}"
+      _ -> raise ArgumentError, "could not dump #{inspect(value)} to type #{inspect(type_info)}"
     end
   end
 

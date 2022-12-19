@@ -27,7 +27,21 @@ defmodule Janus.Policy do
         end
       end
 
-  The `policy_for/2` callback
+  The `policy_for/2` callback is the only callback that is required in policy modules.
+
+  ### Allow and forbid actions
+
+  TODO: `allow/4` and `forbid/4` usage.
+
+  #### Shared options
+
+    * `:where`
+    * `:where_not`
+    * `:or_where` (TODO, not yet implemented)
+
+  #### Function overrides
+
+  TODO: arity-3 function to define dynamic or boolean for given attr
 
   ## Using policies
 
@@ -66,15 +80,79 @@ defmodule Janus.Policy do
 
   defstruct rules: %{}
 
+  @doc """
+  Returns the policy for the given actor.
+
+  This is the only callback that is required in a policy module.
+  """
   @callback policy_for(t, Janus.actor()) :: t
 
+  @doc """
+  Invoked prior to `c:policy_for/2` and may update the default policy and actor or halt.
+
+  See `before_policy_for/1` for more info.
+  """
   @callback before_policy_for(any(), t, Janus.actor()) ::
               {:cont, t, Janus.actor()} | {:halt, t, Janus.actor()}
 
-  @callback authorize(any(), Janus.action(), Janus.actor(), keyword()) :: {:ok, any()} | :error
+  @doc """
+  Authorizes a loaded resource.
 
-  @callback any_authorized?(Janus.schema(), Janus.action(), Janus.actor()) :: boolean()
+  Returns `{:ok, resource}` if authorized, otherwise `:error`.
+  """
+  @callback authorize(struct(), Janus.action(), Janus.actor() | t, keyword()) ::
+              {:ok, struct()} | :error
 
+  @doc """
+  Checks whether any permissions are defined for the given schema, action, and actor.
+
+  This function is most useful in conjunction with `c:filter_authorized/4`, which builds
+  an `Ecto` query that filters to only those resources the actor is authorized for. If
+  you run the resulting query and receive `[]`, it is not possible to determine whether
+  the result is empty because the actor wasn't authorized for _any_ resources or because
+  of other restrictions on the query.
+
+  For example, you might use the following pattern to load all the resources a user is
+  allowed to read that were inserted in the last day:
+
+      query = from(r in MyResource, where: r.inserted_at > from_now(-1, "day"))
+
+      if any_authorized?(query, :read, user) do
+        {:ok, filter_authorized(query, :read, user) |> Repo.all()}
+      else
+        :error
+      end
+
+  This would result in `{:ok, results}` if the user is authorized to read any resources,
+  even if the result set is empty, and would result in `:error` if the user isn't
+  authorized to read the resources at all.
+  """
+  @callback any_authorized?(Janus.schema(), Janus.action(), Janus.actor() | t) :: boolean()
+
+  @doc """
+  Create an `%Ecto.Query{}` that results in only authorized records.
+
+  Like the `Ecto.Query` API, this function can accept a schema as the first argument or a
+  query, in which case it will compose with that query. If a query is passed, the
+  appropriate schema will be derived from that query's source.
+
+      filter_authorized(MyResource, :read, user)
+
+      query = from(r in MyResource, where: r.inserted_at > from_ago(1, "day"))
+      filter_authorized(query, :read, user)
+
+  If the query specifies the source as a string, we cannot derive the schema. For
+  example, this will not work:
+
+      # Raises an ArgumentError
+      query = from(r in "my_resources", where: r.inserted_at > from_ago(1, "day"))
+      filter_authorized(query, :read, user)
+
+  ## Options
+
+    * `:preload_authorized` - Similar to `Ecto.Query.preload/3`, but only preloads those
+      associated records that are authorized.
+  """
   @callback filter_authorized(
               Ecto.Query.t() | Janus.schema(),
               Janus.action(),
@@ -193,7 +271,15 @@ defmodule Janus.Policy do
     end
   end
 
-  @doc "TODO"
+  @doc """
+  Allows an action on the schema if matched by opts.
+
+  ## Examples
+
+      policy
+      |> allow(:read, FirstResource)
+      |> allow(:create, SecondResource, where: [creator: [id: user.id]])
+  """
   @spec allow(t, Janus.action(), Janus.schema(), keyword()) :: t
   def allow(%Policy{} = policy, action, schema, opts \\ []) do
     policy
@@ -202,7 +288,15 @@ defmodule Janus.Policy do
     |> put_rule(policy)
   end
 
-  @doc "TODO"
+  @doc """
+  Forbids an action on the schema if matched by opts.
+
+  ## Examples
+
+      policy
+      |> allow(:read, FirstResource)
+      |> forbid(:read, FirstResource, where: [scope: :private])
+  """
   @spec forbid(t, Janus.action(), Janus.schema(), keyword()) :: t
   def forbid(%Policy{} = policy, action, schema, opts \\ []) do
     policy
@@ -211,7 +305,36 @@ defmodule Janus.Policy do
     |> put_rule(policy)
   end
 
-  @doc "TODO (derived permissions)"
+  @doc """
+  Specifies that an association should match if the association's schema is authorized.
+
+  This allows authorization to be "delegated" to an association.
+
+  ## Example
+
+  Let's say we have some posts with comments. Posts are visible unless they are archived,
+  and all comments of visible posts are also visible. To start, we can duplicate the
+  condition:
+
+      policy
+      |> allow(:read, Post, where: [archived: false])
+      |> allow(:read, Comment, where: [post: [archived: false]])
+
+  If we add additional clauses to the condition for posts, however, we will have to
+  duplicate them for comments. We can use `allows` instead:
+
+      policy
+      |> allow(:read, Post, where: [archived: false])
+      |> allow(:read, Comment, where: [post: allows(:read)])
+
+  Now let's say we add a feature that allows for draft posts, which should not be visible
+  unless a `published_at` is set. We can modify only the condition for `Post` and that
+  change will propogate to comments.
+
+      policy
+      |> allow(:read, Post, where: [archived: false], where_not: [published_at: nil])
+      |> allow(:read, Comment, where: [post: allows(:read)])
+  """
   @spec allows(Janus.action()) :: tuple()
   def allows(action), do: {:__janus_derived__, action}
 
