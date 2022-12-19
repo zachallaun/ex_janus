@@ -55,33 +55,22 @@ defmodule Janus.Filter do
     {query, schema} = Janus.Utils.resolve_query_and_schema!(query_or_schema)
     rule = Janus.Policy.rule_for(policy, action, schema)
 
-    %Janus.Filter{
+    base_filter = %Janus.Filter{
       policy: policy,
       action: action,
       schema: schema,
       dynamic: false,
       binding: @root_binding
     }
-    |> filter_or_where(rule.allow)
-    |> filter_and_where_not(rule.forbid)
+
+    allowed = with_conditions(base_filter, rule.allow)
+    forbidden = with_conditions(base_filter, rule.forbid)
+
+    combine(allowed, :and_not, forbidden)
     |> to_query(Keyword.put(opts, :query, query))
   end
 
-  defp filter_or_where(filter, []), do: filter
-
-  defp filter_or_where(filter, conditions) do
-    f = with_conditions(filter, conditions)
-    combine(filter, :or, f)
-  end
-
-  defp filter_and_where_not(filter, []), do: filter
-
-  defp filter_and_where_not(filter, conditions) do
-    f = with_conditions(filter, conditions)
-    combine(filter, :and_not, f)
-  end
-
-  defp with_conditions(%Filter{} = filter, conditions) do
+  defp with_conditions(filter, conditions) do
     for condition <- conditions, reduce: filter do
       filter ->
         f = apply_condition(condition, filter)

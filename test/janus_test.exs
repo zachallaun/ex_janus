@@ -276,6 +276,27 @@ defmodule JanusTest do
                Janus.filter_authorized(Thread, :read, policy) |> Repo.all()
     end
 
+    test "should forbid action if an allow is overriden" do
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Thread)
+        |> forbid(:read, Thread, where: [archived: true])
+
+      %{id: thread_id} = thread = thread_fixture()
+
+      assert {:ok, ^thread} = Janus.authorize(thread, :read, policy)
+
+      assert [%Thread{id: ^thread_id}] =
+               Janus.filter_authorized(Thread, :read, policy) |> Repo.all()
+
+      forbidden = thread_fixture(%{archived: true})
+
+      assert :error = Janus.authorize(forbidden, :read, policy)
+
+      assert [%Thread{id: ^thread_id}] =
+               Janus.filter_authorized(Thread, :read, policy) |> Repo.all()
+    end
+
     test "should dump values to the correct underlying type" do
       policy =
         %Janus.Policy{}
