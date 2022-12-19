@@ -64,7 +64,6 @@ defmodule Janus.Filter do
     }
     |> filter_or_where(rule.allow)
     |> filter_and_where_not(rule.forbid)
-    |> filter_or_where(rule.always_allow)
     |> to_query(Keyword.put(opts, :query, query))
   end
 

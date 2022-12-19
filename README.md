@@ -133,8 +133,6 @@ defmodule Discoarse.Policy do
     # Note that moderators will not be able to archive the first post in a thread due to
     # the `forbid` rule in user permissions
     |> allow([:read, :edit, :archive], Forum.Post)
-    # This could be overridden using `always_allow/3` instead:
-    # |> always_allow(:archive, Forum.Post)
   end
 end
 ```

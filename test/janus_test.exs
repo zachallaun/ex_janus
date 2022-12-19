@@ -18,8 +18,6 @@ defmodule JanusTest do
       def policy_for(policy, _) do
         policy
         |> allow(:read, Thread)
-        |> forbid(:read, Thread)
-        |> always_allow(:read, Thread)
       end
     end
 
@@ -158,7 +156,7 @@ defmodule JanusTest do
       refute Janus.any_authorized?(Post, :read, policy)
     end
 
-    test "should return false if a blanket forbid exists without an always_allow" do
+    test "should return false if a blanket forbid exists" do
       policy =
         %Janus.Policy{}
         |> allow(:read, Thread)
@@ -172,15 +170,6 @@ defmodule JanusTest do
         |> allow(:read, Thread)
 
       refute Janus.any_authorized?(Thread, :read, policy)
-    end
-
-    test "should return true if an always_allow exists" do
-      policy =
-        %Janus.Policy{}
-        |> forbid(:read, Thread)
-        |> always_allow(:read, Thread)
-
-      assert Janus.any_authorized?(Thread, :read, policy)
     end
 
     test "should return true if a forbid is conditional on attribute match" do
@@ -227,19 +216,6 @@ defmodule JanusTest do
 
       assert :error = Janus.authorize(thread, :ready, policy)
       assert [] = Janus.filter_authorized(Post, :read, policy) |> Repo.all()
-    end
-
-    test "should override forbid with always_allow" do
-      policy =
-        %Janus.Policy{}
-        |> allow(:read, Thread)
-        |> forbid(:read, Thread)
-        |> always_allow(:read, Thread)
-
-      thread = thread_fixture()
-
-      assert {:ok, ^thread} = Janus.authorize(thread, :read, policy)
-      assert [%Thread{}] = Janus.filter_authorized(Thread, :read, policy) |> Repo.all()
     end
   end
 

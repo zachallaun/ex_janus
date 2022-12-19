@@ -22,7 +22,6 @@ defmodule Janus do
     false
     |> allow_if_any?(rule.allow, policy, object)
     |> forbid_if_any?(rule.forbid, policy, object)
-    |> allow_if_any?(rule.always_allow, policy, object)
     |> case do
       true -> {:ok, object}
       false -> :error
@@ -107,8 +106,7 @@ defmodule Janus do
     {_query, schema} = Janus.Utils.resolve_query_and_schema!(schema_or_query)
 
     case Janus.Policy.rule_for(policy, action, schema) do
-      %{allow: [], always_allow: []} -> false
-      %{always_allow: [_ | _]} -> true
+      %{allow: []} -> false
       _ -> true
     end
   end

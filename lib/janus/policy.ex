@@ -53,7 +53,6 @@ defmodule Janus.Policy do
   0. Let resources be the set of objects we're starting from.
   1. Filter resources to those matched by any `allow` rule.
   2. Take the difference of 1. and resources matched by any `forbid` rule.
-  3. Take the union of 2. and resources matched by any `always_allow` rule.
   """
 
   alias __MODULE__
@@ -209,15 +208,6 @@ defmodule Janus.Policy do
     policy
     |> rule_for(action, schema)
     |> Rule.forbid(opts)
-    |> put_rule(policy)
-  end
-
-  @doc "TODO"
-  @spec always_allow(t, Janus.action(), Janus.schema(), keyword()) :: t
-  def always_allow(%Policy{} = policy, action, schema, opts \\ []) do
-    policy
-    |> rule_for(action, schema)
-    |> Rule.always_allow(opts)
     |> put_rule(policy)
   end
 
