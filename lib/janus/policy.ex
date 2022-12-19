@@ -280,8 +280,16 @@ defmodule Janus.Policy do
       |> allow(:read, FirstResource)
       |> allow(:create, SecondResource, where: [creator: [id: user.id]])
   """
-  @spec allow(t, Janus.action(), Janus.schema(), keyword()) :: t
-  def allow(%Policy{} = policy, action, schema, opts \\ []) do
+  @spec allow(t, Janus.action() | [Janus.action()], Janus.schema(), keyword()) :: t
+  def allow(policy, action, schema, opts \\ [])
+
+  def allow(%Policy{} = policy, actions, schema, opts) when is_list(actions) do
+    Enum.reduce(actions, policy, fn action, policy ->
+      allow(policy, action, schema, opts)
+    end)
+  end
+
+  def allow(%Policy{} = policy, action, schema, opts) do
     policy
     |> rule_for(action, schema)
     |> Rule.allow(opts)
@@ -298,7 +306,15 @@ defmodule Janus.Policy do
       |> forbid(:read, FirstResource, where: [scope: :private])
   """
   @spec forbid(t, Janus.action(), Janus.schema(), keyword()) :: t
-  def forbid(%Policy{} = policy, action, schema, opts \\ []) do
+  def forbid(policy, action, schema, opts \\ [])
+
+  def forbid(%Policy{} = policy, actions, schema, opts) when is_list(actions) do
+    Enum.reduce(actions, policy, fn action, policy ->
+      forbid(policy, action, schema, opts)
+    end)
+  end
+
+  def forbid(%Policy{} = policy, action, schema, opts) do
     policy
     |> rule_for(action, schema)
     |> Rule.forbid(opts)

@@ -523,4 +523,29 @@ defmodule JanusTest do
       assert [_, _] = Janus.filter_authorized(Post, :read, policy) |> Repo.all()
     end
   end
+
+  describe "allow/4 and forbid/4" do
+    test "should optionally accept a list of actions" do
+      policy =
+        %Janus.Policy{}
+        |> allow([:read, :create], Thread)
+        |> forbid([:read, :edit], Thread, where: [title: "forbidden"])
+
+      %{id: thread_id} = thread = thread_fixture()
+
+      assert {:ok, ^thread} = Janus.authorize(thread, :read, policy)
+      assert {:ok, _thread} = Janus.authorize(%Thread{}, :create, policy)
+
+      assert [%Thread{id: ^thread_id}] =
+               Janus.filter_authorized(Thread, :read, policy) |> Repo.all()
+
+      forbidden = thread_fixture(%{title: "forbidden"})
+
+      assert :error = Janus.authorize(forbidden, :read, policy)
+      assert :error = Janus.authorize(forbidden, :edit, policy)
+
+      assert [%Thread{id: ^thread_id}] =
+               Janus.filter_authorized(Thread, :read, policy) |> Repo.all()
+    end
+  end
 end
