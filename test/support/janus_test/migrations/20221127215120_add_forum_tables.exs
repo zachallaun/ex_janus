@@ -11,6 +11,7 @@ defmodule JanusTest.Repo.Migrations.AddForumTables do
     create table("threads") do
       add :title, :string
       add :archived, :boolean
+      add :category, :string
       add :creator_id, references("users")
 
       timestamps()

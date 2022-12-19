@@ -6,6 +6,7 @@ defmodule JanusTest.Schemas.Thread do
 
   schema "threads" do
     field :title, :string
+    field :category, :string
     field :archived, :boolean, default: false
 
     timestamps()
@@ -16,7 +17,7 @@ defmodule JanusTest.Schemas.Thread do
 
   def changeset(post, attrs) do
     post
-    |> cast(attrs, [:title, :archived, :creator_id])
+    |> cast(attrs, [:title, :category, :archived, :creator_id])
     |> validate_required([:title, :creator_id])
     |> cast_assoc(:posts, with: &Post.changeset/2)
   end

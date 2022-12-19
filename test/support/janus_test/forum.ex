@@ -10,37 +10,29 @@ defmodule JanusTest.Forum do
     |> Repo.insert()
   end
 
-  def create_thread(creator, title, content) do
-    thread_attrs = %{
-      creator_id: creator.id,
-      title: title,
-      posts: [%{author_id: creator.id, content: content, index: 0}]
-    }
+  def create_thread(%{creator_id: id} = attrs) do
+    {content, attrs} = Map.pop!(attrs, :content)
+    attrs = Map.put(attrs, :posts, [%{author_id: id, content: content, index: 0}])
 
     %Thread{}
-    |> Thread.changeset(thread_attrs)
+    |> Thread.changeset(attrs)
     |> Repo.insert()
   end
 
-  def create_post(author, thread, content) do
+  def create_post(%{thread_id: id} = attrs) do
     index =
       from(p in Post,
-        where: [thread_id: ^thread.id],
+        where: [thread_id: ^id],
         select: p.index,
         order_by: [desc: :index],
         limit: 1
       )
       |> Repo.one!()
 
-    post_attrs = %{
-      author_id: author.id,
-      thread_id: thread.id,
-      content: content,
-      index: index + 1
-    }
+    attrs = Map.put(attrs, :index, index + 1)
 
     %Post{}
-    |> Post.changeset(post_attrs)
+    |> Post.changeset(attrs)
     |> Repo.insert()
   end
 end

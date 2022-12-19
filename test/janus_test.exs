@@ -254,7 +254,7 @@ defmodule JanusTest do
       [user1, user2] = [user_fixture(), user_fixture()]
       [policy1, policy2] = [policy_for.(user1), policy_for.(user2)]
 
-      thread = thread_fixture(user1)
+      thread = thread_fixture(%{creator_id: user1.id})
 
       assert {:ok, ^thread} = Janus.authorize(thread, :edit, policy1)
       assert :error = Janus.authorize(thread, :edit, policy2)
@@ -368,7 +368,7 @@ defmodule JanusTest do
         %Janus.Policy{}
         |> allow(:edit, Post, where: [thread: [creator: [id: user.id]]])
 
-      %{posts: [post]} = thread_fixture(user)
+      %{posts: [post]} = thread_fixture(%{creator_id: user.id})
       post = Repo.preload(post, thread: :creator)
 
       assert {:ok, ^post} = Janus.authorize(post, :edit, policy)
@@ -427,9 +427,16 @@ defmodule JanusTest do
       [t1, t2, t3] = for _ <- 1..3, do: thread_fixture()
 
       _ = t3 |> Thread.changeset(%{archived: true}) |> Repo.update!()
-      {:ok, _} = Forum.create_post(t1.creator, t1, "post")
-      {:ok, _} = Forum.create_post(t2.creator, t2, "post")
-      {:ok, _} = Forum.create_post(t3.creator, t3, "non-visible post")
+
+      {:ok, _} = Forum.create_post(%{author_id: t1.creator.id, thread_id: t1.id, content: "post"})
+      {:ok, _} = Forum.create_post(%{author_id: t2.creator.id, thread_id: t2.id, content: "post"})
+
+      {:ok, _} =
+        Forum.create_post(%{
+          author_id: t3.creator.id,
+          thread_id: t3.id,
+          content: "non-visible post"
+        })
 
       first_post_query = Ecto.Query.from(Post, order_by: :id, limit: 1)
 
