@@ -170,6 +170,10 @@ defmodule Janus.Filter do
     raise ArgumentError, "permission functions must have arity 3 (#{inspect(fun)})"
   end
 
+  defp dynamic_compare(filter, field, nil) do
+    dynamic(as(^filter.binding) |> field(^field) |> is_nil())
+  end
+
   defp dynamic_compare(filter, field, value) do
     type_info = filter.schema.__schema__(:type, field)
     dumped_value = dump!(type_info, value)

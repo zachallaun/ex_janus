@@ -288,6 +288,21 @@ defmodule JanusTest do
       assert :error = Janus.authorize(u2, :read, policy)
       assert [%User{id: ^u1_id}] = Janus.filter_authorized(User, :read, policy) |> Repo.all()
     end
+
+    test "should allow comparisons to nil" do
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Thread, where: [category: nil])
+
+      %{id: allowed_id} = allowed = thread_fixture()
+      not_allowed = thread_fixture(%{category: "anything"})
+
+      assert {:ok, ^allowed} = Janus.authorize(allowed, :read, policy)
+      assert :error = Janus.authorize(not_allowed, :read, policy)
+
+      assert [%Thread{id: ^allowed_id}] =
+               Janus.filter_authorized(Thread, :read, policy) |> Repo.all()
+    end
   end
 
   describe "function permissions" do
