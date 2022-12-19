@@ -1,6 +1,46 @@
 defmodule Janus.Policy do
   @moduledoc """
-  TODO
+  Define composable authorization policies for actors in your system.
+
+  Policy modules are created by invoking `use Janus.Policy` and are responsible for
+  defining policies for the actors in your system as well as the API that the rest of
+  your application may use to enforce those policies.
+
+  A policy is a data structure created for an actor in your system that defines the
+  schemas that actor can access, the actions they can take, and any restrictions to
+  the set of resources that can be accessed. These policies can be created explicitly by
+  calling `policy_for/2`, but they are also created implicitly by any function that
+  accepts an actor as an argument, e.g. `authorize/2`, `filter_authorized/4`, etc.
+
+  ## Defining policies
+
+  You can create a policy module yourself that invokes `use Janus.Policy`, or generate
+  one to start by running `mix janus.gen.policy`. You will end up with something similar
+  to this:
+
+      defmodule MyApp.Policy do
+        use Janus.Policy
+
+        @impl true
+        def policy_for(policy, _user) do
+          policy
+        end
+      end
+
+  The `policy_for/2` callback
+
+  ## Using policies
+
+  Policy modules expose a minimal API that can be used to authorize and load authorized
+  resources throughout the rest of your application.
+
+    * `c:authorize/4` - authorize an individual, already-loaded resource
+    * `c:filter_authorized/4` - construct an `Ecto` query for a schema that will filter
+      results to only those that are authorized
+    * `c:any_authorized?/3` - checks whether the given actor/policy has _any_ access to
+      the given schema for the given action
+
+  See the documentation for each callback above for additional details.
 
   ## How policy rules combine
 
@@ -63,19 +103,16 @@ defmodule Janus.Policy do
       def policy_for(%Janus.Policy{} = policy), do: policy
       def policy_for(actor), do: policy_for(%Janus.Policy{}, actor)
 
-      @doc "See `Janus.authorize/4`"
       @impl true
       def authorize(object, action, actor, opts \\ []) do
         Janus.authorize(object, action, policy_for(actor), opts)
       end
 
-      @doc "See `Janus.any_authorized?/3`"
       @impl true
       def any_authorized?(schema, action, actor) do
         Janus.any_authorized?(schema, action, policy_for(actor))
       end
 
-      @doc "See `Janus.filter_authorized/4`"
       @impl true
       def filter_authorized(query_or_schema, action, actor, opts \\ []) do
         Janus.filter_authorized(query_or_schema, action, policy_for(actor), opts)
