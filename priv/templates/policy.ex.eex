@@ -57,15 +57,13 @@ defmodule <%= module %> do
       ...> load_authorized(MyResource, :read, user)
       {:ok, [%MyResource{...}, ...]}
   """
-  defmacro load_authorized(query_or_schema, action, actor, opts \\ []) do
-    quote bind_quoted: [query_or_schema: query_or_schema, action: action, actor: actor, opts: opts] do
-      policy = unquote(__MODULE__).policy_for(actor)
+  def load_authorized(query_or_schema, action, actor, opts \\ []) do
+    policy = policy_for(actor)
 
-      if unquote(__MODULE__).any_authorized?(query_or_schema, action, actor) do
-        {:ok, unquote(__MODULE__).authorized(query_or_schema, action, policy) |> Repo.all()}
-      else
-        :error
-      end
+    if any_authorized?(query_or_schema, action, policy) do
+      {:ok, filter_authorized(query_or_schema, action, policy, opts) |> Repo.all()}
+    else
+      :error
     end
   end
 end
