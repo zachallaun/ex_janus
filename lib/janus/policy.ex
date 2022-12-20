@@ -111,18 +111,6 @@ defmodule Janus.Policy do
       the given schema for the given action
 
   See the documentation for each callback above for additional details.
-
-  ## How policy rules combine
-
-  Since policy rules are used to authorize an action on an individual resource and for
-  data loading, it's best to consider how the rules apply to a set of resources, then the
-  case of a single resource can be thought of as a set containing only that resource.
-
-  The conceptual algorithm in terms of set operations:
-
-  0. Let resources be the set of objects we're starting from.
-  1. Filter resources to those matched by any `allow` rule.
-  2. Take the difference of 1. and resources matched by any `forbid` rule.
   """
 
   alias __MODULE__
