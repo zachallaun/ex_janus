@@ -11,11 +11,7 @@ defmodule Janus do
   @type schema :: atom()
   @type actor :: any()
 
-  @doc """
-  Authorize that the given `action` is allowed for `object` based on `policy`.
-
-  Returns `{:ok, object}` if the action is authorized and `:error` otherwise.
-  """
+  @doc false
   def authorize(%schema{} = object, action, policy, _opts \\ []) do
     rule = Janus.Policy.rule_for(policy, action, schema)
 
@@ -95,13 +91,7 @@ defmodule Janus do
     end
   end
 
-  @doc """
-  Check whether any authorization permissions are set for the given schema and action.
-
-  This can be useful because `authorized/4` creates a query with no results if the user
-  is not authorized to see any elements of the resource, but it may not be possible to
-  differentiate between that and there just happening to be no records that match.
-  """
+  @doc false
   def any_authorized?(schema_or_query, action, policy) do
     {_query, schema} = Janus.Utils.resolve_query_and_schema!(schema_or_query)
 
@@ -111,15 +101,7 @@ defmodule Janus do
     end
   end
 
-  @doc """
-  Creates an `Ecto.Query` that filters records from `schema` to those that can have
-  `action` performed according to the `policy`.
-
-  ## Options
-
-  * `:preload_authorized` - preload associated resources on the result, but filtered to
-    those that are allowed based on the action and policy.
-  """
+  @doc false
   def filter_authorized(query_or_schema, action, policy, opts \\ []) do
     Janus.Filter.filter(query_or_schema, action, policy, opts)
   end
