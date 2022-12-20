@@ -99,7 +99,7 @@ defmodule Janus.Filter do
 
   defp combine_dynamic(d1, :and, d2), do: simplify_and(d1, d2)
   defp combine_dynamic(d1, :or, d2), do: simplify_or(d1, d2)
-  defp combine_dynamic(d1, :and_not, d2), do: simplify_and(d1, dynamic(not (^d2)))
+  defp combine_dynamic(d1, :and_not, d2), do: simplify_and(d1, simplify_not(d2))
 
   defp merge_joins(j1, j2), do: Enum.uniq(j1 ++ j2)
 
@@ -212,6 +212,10 @@ defmodule Janus.Filter do
   defp simplify_or(clause, false), do: clause
   defp simplify_or(clause1, clause2), do: dynamic(^clause1 or ^clause2)
 
+  defp simplify_not(true), do: false
+  defp simplify_not(false), do: true
+  defp simplify_not(clause), do: dynamic(not (^clause))
+
   defp with_preload_authorized(query, _filter, nil), do: query
 
   defp with_preload_authorized(query, filter, preload_opt) do
@@ -220,30 +224,20 @@ defmodule Janus.Filter do
     query =
       for preload <- preloads, reduce: query do
         query ->
-          related_as_filtered = :"#{preload.related_as}_f"
-
-          with_related =
-            with_named_binding(query, preload.related_as, fn query, related_as ->
-              from([{^preload.owner_as, r}] in query,
-                left_join: assoc(r, ^preload.assoc),
-                as: ^related_as
-              )
-            end)
-
-          from(with_related,
+          from([{^preload.owner_as, r}] in query,
             left_lateral_join:
-              subquery(
+              lateral in subquery(
                 from(
-                  a in preload.related_query,
+                  a in preload.related_filtered,
                   where:
                     field(a, ^preload.related_key) ==
                       field(parent_as(^preload.owner_as), ^preload.owner_key),
                   select: %{id: a.id, lateral_selected: true}
                 )
               ),
-            as: ^related_as_filtered,
-            on: as(^preload.related_as).id == as(^related_as_filtered).id,
-            where: is_nil(as(^preload.related_as).id) or as(^related_as_filtered).lateral_selected
+            left_join: a in assoc(r, ^preload.assoc),
+            as: ^preload.related_as,
+            on: a.id == lateral.id
           )
       end
 
@@ -281,7 +275,9 @@ defmodule Janus.Filter do
     related_schema = schema.__schema__(:association, assoc).related
 
     {preload, [{assoc, dynamic}]} = preload_spec(assoc, schema, binding, filter, related_query)
-    {rest_preloads, rest_preload_opt} = calc_preloads(rest, related_schema, assoc, filter)
+
+    {rest_preloads, rest_preload_opt} =
+      calc_preloads(rest, related_schema, preload.related_as, filter)
 
     {[preload | rest_preloads], [{assoc, {dynamic, rest_preload_opt}}]}
   end
@@ -289,16 +285,17 @@ defmodule Janus.Filter do
   defp preload_spec(assoc, schema, binding, filter, related_query \\ nil) do
     association = schema.__schema__(:association, assoc)
     related_query = related_query || association.queryable
+    related_as = :"#{assoc}_preload"
 
     preload = %{
       assoc: assoc,
       owner_as: binding,
       owner_key: association.owner_key,
-      related_query: filter(related_query, filter.action, filter.policy),
-      related_as: assoc,
+      related_filtered: filter(related_query, filter.action, filter.policy),
+      related_as: related_as,
       related_key: association.related_key
     }
 
-    {preload, [{assoc, dynamic([{^assoc, a}], a)}]}
+    {preload, [{assoc, dynamic([{^related_as, a}], a)}]}
   end
 end

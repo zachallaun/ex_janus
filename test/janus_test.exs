@@ -419,69 +419,73 @@ defmodule JanusTest do
       assert {:ok, ^post} = Janus.authorize(post, :edit, policy)
       assert [_] = Janus.filter_authorized(Post, :edit, policy) |> Repo.all()
     end
+  end
 
-    test ":preload_authorized should load authorizeded associations" do
+  describe ":preload_authorized" do
+    setup do
+      # Create 3 threads with 2 posts each. The third thread is archived.
+      threads =
+        for i <- 1..3 do
+          t = thread_fixture(%{content: "t#{i} post", archived: i == 3})
+          Forum.create_post(%{author_id: t.creator_id, thread_id: t.id, content: "post"})
+          t
+        end
+
+      {:ok, threads: threads}
+    end
+
+    test "should only load authorized associations" do
       policy =
         %Janus.Policy{}
         |> allow(:read, Thread, where: [archived: false])
         |> allow(:read, Post, where: [archived: false])
 
-      [_t1, _t2, t3] = for _ <- 1..3, do: thread_fixture()
-      _ = t3 |> Thread.changeset(%{archived: true}) |> Repo.update!()
+      query =
+        Post
+        |> Ecto.Query.order_by(:id)
+        |> Janus.filter_authorized(:read, policy, preload_authorized: :thread)
 
-      query = Janus.filter_authorized(Post, :read, policy, preload_authorized: :thread)
-
-      assert [%Post{thread: %Thread{}}, %Post{thread: %Thread{}}] = query |> Repo.all()
+      assert [
+               %Post{thread: %Thread{}},
+               %Post{thread: %Thread{}},
+               %Post{thread: %Thread{}},
+               %Post{thread: %Thread{}},
+               %Post{thread: nil},
+               %Post{thread: nil}
+             ] = query |> Repo.all()
     end
 
-    test ":preload_authorized should include records with empty associations" do
+    test "shouldn't exclude records with empty preloads" do
       policy =
         %Janus.Policy{}
         |> allow(:read, User)
 
-      _ = user_fixture()
-
       query = Janus.filter_authorized(User, :read, policy, preload_authorized: :threads)
 
-      assert [%User{}] = query |> Repo.all()
+      assert [%User{threads: []}, %User{threads: []}, %User{threads: []}] = query |> Repo.all()
     end
 
-    test ":preload_authorized should load nested associations" do
+    test "should load nested preloads" do
       policy =
         %Janus.Policy{}
         |> allow(:read, Thread, where: [archived: false])
         |> allow(:read, Post, where: [archived: false, thread: allows(:read)])
-
-      [_t1, _t2, t3] = for _ <- 1..3, do: thread_fixture()
-      _ = t3 |> Thread.changeset(%{archived: true}) |> Repo.update!()
 
       query = Janus.filter_authorized(Post, :read, policy, preload_authorized: [thread: :posts])
 
       assert [
-               %Post{thread: %Thread{posts: [%Post{}]}},
-               %Post{thread: %Thread{posts: [%Post{}]}}
+               %Post{thread: %Thread{posts: [%Post{}, %Post{}]}},
+               %Post{thread: %Thread{posts: [%Post{}, %Post{}]}},
+               %Post{thread: %Thread{posts: [%Post{}, %Post{}]}},
+               %Post{thread: %Thread{posts: [%Post{}, %Post{}]}}
              ] = query |> Repo.all()
     end
 
-    test ":preload_authorized should accept queries to be applied to each nested assoc" do
+    test ":preload_authorized should accept a query to filter preloads" do
       policy =
         %Janus.Policy{}
         |> allow(:read, Thread, where: [archived: false])
         |> allow(:read, Post, where: [archived: false, thread: allows(:read)])
-
-      [t1, t2, t3] = for _ <- 1..3, do: thread_fixture()
-
-      _ = t3 |> Thread.changeset(%{archived: true}) |> Repo.update!()
-
-      {:ok, _} = Forum.create_post(%{author_id: t1.creator.id, thread_id: t1.id, content: "post"})
-      {:ok, _} = Forum.create_post(%{author_id: t2.creator.id, thread_id: t2.id, content: "post"})
-
-      {:ok, _} =
-        Forum.create_post(%{
-          author_id: t3.creator.id,
-          thread_id: t3.id,
-          content: "non-visible post"
-        })
 
       first_post_query = Ecto.Query.from(Post, order_by: :id, limit: 1)
 
@@ -490,12 +494,32 @@ defmodule JanusTest do
           preload_authorized: [posts: first_post_query]
         )
 
-      %{posts: [%{id: p1_id}]} = t1
-      %{posts: [%{id: p2_id}]} = t2
+      assert [
+               %Thread{posts: [%Post{content: "t1 post"}]},
+               %Thread{posts: [%Post{content: "t2 post"}]}
+             ] = query |> Repo.all()
+    end
+
+    test ":preload_authorized should accept queries to filter nested preloads" do
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, User)
+        |> allow(:read, Thread, where: [archived: false])
+        |> allow(:read, Post, where: [archived: false, thread: allows(:read)])
+
+      first_thread_query = Ecto.Query.from(Thread, order_by: :id, limit: 1)
+      first_post_query = Ecto.Query.from(Post, order_by: :id, limit: 1)
+
+      query =
+        Janus.filter_authorized(User, :read, policy,
+          preload_authorized: [threads: {first_thread_query, posts: first_post_query}]
+        )
+        |> Ecto.Query.order_by(:id)
 
       assert [
-               %Thread{posts: [%{id: ^p1_id}]},
-               %Thread{posts: [%{id: ^p2_id}]}
+               %User{threads: [%Thread{posts: [%Post{content: "t1 post"}]}]},
+               %User{threads: [%Thread{posts: [%Post{content: "t2 post"}]}]},
+               %User{threads: []}
              ] = query |> Repo.all()
     end
   end
