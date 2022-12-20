@@ -99,6 +99,14 @@ defmodule Janus.Policy do
   first argument, `:boolean` or `:dynamic`, so that they can handle both operations on
   a single record and operations that should compose with an Ecto query.
 
+  ### `before_policy_for` hooks
+
+  You can register hooks to be run prior to `c:policy_for/2` using `before_policy_for/1`.
+  These hooks can be used to change the default (usually empty) policy or actor, or to
+  prevent `c:policy_for/2` from being run altogether.
+
+  See the `before_policy_for/1` for more details.
+
   ## Using policies
 
   Policy modules expose a minimal API that can be used to authorize and load authorized
@@ -130,14 +138,6 @@ defmodule Janus.Policy do
   This is the only callback that is required in a policy module.
   """
   @callback policy_for(t, Janus.actor()) :: t
-
-  @doc """
-  Invoked prior to `c:policy_for/2` and may update the default policy and actor or halt.
-
-  See `before_policy_for/1` for more info.
-  """
-  @callback before_policy_for(any(), t, Janus.actor()) ::
-              {:cont, t, Janus.actor()} | {:halt, t, Janus.actor()}
 
   @doc """
   Authorizes a loaded resource.
@@ -203,8 +203,6 @@ defmodule Janus.Policy do
               Janus.actor(),
               keyword()
             ) :: Ecto.Query.t()
-
-  @optional_callbacks before_policy_for: 3
 
   @janus_hooks :__janus_hooks__
 
@@ -275,7 +273,7 @@ defmodule Janus.Policy do
         defoverridable policy_for: 2
 
         def policy_for(policy, actor) do
-          case Janus.Policy.run_hooks(unquote(hooks), policy, actor, __MODULE__) do
+          case Janus.Policy.run_hooks(unquote(hooks), policy, actor) do
             {:cont, policy, actor} -> super(policy, actor)
             {:halt, policy} -> policy
           end
@@ -285,15 +283,23 @@ defmodule Janus.Policy do
   end
 
   @doc false
-  def run_hooks([hook | hooks], policy, actor, module) do
-    case module.before_policy_for(hook, policy, actor) do
-      {:cont, %Janus.Policy{} = policy, actor} -> run_hooks(hooks, policy, actor, module)
+  def run_hooks([hook | hooks], policy, actor) do
+    case run_hook(hook, policy, actor) do
+      {:cont, %Janus.Policy{} = policy, actor} -> run_hooks(hooks, policy, actor)
       {:halt, %Janus.Policy{} = policy} -> {:halt, policy}
       other -> bad_hook_result!(other, hook)
     end
   end
 
-  def run_hooks([], policy, actor, _module), do: {:cont, policy, actor}
+  def run_hooks([], policy, actor), do: {:cont, policy, actor}
+
+  defp run_hook({module, hook}, policy, actor) when is_atom(module) do
+    module.before_policy_for(hook, policy, actor)
+  end
+
+  defp run_hook(module, policy, actor) when is_atom(module) do
+    module.before_policy_for(:default, policy, actor)
+  end
 
   defp bad_hook_result!(result, hook) do
     raise ArgumentError, """
@@ -307,7 +313,43 @@ defmodule Janus.Policy do
   end
 
   @doc """
-  Registers a hook to be run prior to calling `policy_for/2`.
+  Registers a hook to be run prior to calling `c:policy_for/2`.
+
+  `before_policy_for` hooks can be used to alter the default policy or actor that is
+  being passed into `c:policy_for/2`. This could be used to preload required associations
+  or fields, or to short-circuit the call entirely, immediately returning a policy
+  without running it through `c:policy_for/2`.
+
+  `before_policy_for` takes a module name or a tuple containing a module name and some
+  term. The module is expected to define a function `before_policy_for/3`.
+
+  The function will receive three arguments:
+
+    * term (defaults to `:default`)
+    * policy
+    * actor
+
+  and it must return one of:
+
+    * `{:cont, policy, actor}` - run any further hooks and then `c:policy_for/2`
+    * `{:halt, policy}` - skip any further hooks and `c:policy_for/2` and return `policy`
+
+  ## Example
+
+      before_policy_for __MODULE__
+      before_policy_for {__MODULE__, :check_banned}
+
+      def before_policy_for(:default, policy, actor) do
+        {:cont, policy, preload_required(actor)}
+      end
+
+      def before_policy_for(:check_banned, policy, actor) do
+        if banned?(actor) do
+          {:halt, policy}
+        else
+          {:cont, policy, actor}
+        end
+      end
   """
   defmacro before_policy_for(hook) do
     quote do

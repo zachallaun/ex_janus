@@ -65,13 +65,17 @@ defmodule JanusTest do
     defmodule ExamplePolicyWithHooks do
       use Janus.Policy
 
-      before_policy_for :wrap_if_1
-      before_policy_for :halt_if_2
-      before_policy_for :shouldnt_run_after_halt_if_2
-      before_policy_for :invalid_if_3
+      before_policy_for __MODULE__
+      before_policy_for {__MODULE__, :wrap_if_1}
+      before_policy_for {__MODULE__, :halt_if_2}
+      before_policy_for {__MODULE__, :shouldnt_run_after_halt_if_2}
+      before_policy_for {__MODULE__, :invalid_if_3}
 
-      @impl true
-      def before_policy_for(hook, policy, actor)
+      def before_policy_for(:default, policy, 0) do
+        {:cont, policy, {:default, 0}}
+      end
+
+      def before_policy_for(:default, policy, actor), do: {:cont, policy, actor}
 
       def before_policy_for(:wrap_if_1, policy, 1) do
         {:cont, policy, {:wrapped, 1}}
@@ -107,6 +111,11 @@ defmodule JanusTest do
       end
     end
 
+    test "should run callback with :default if only module is given" do
+      assert %Janus.Policy{} = ExamplePolicyWithHooks.policy_for(0)
+      assert_received {:policy_for, %Janus.Policy{}, {:default, 0}}
+    end
+
     test "should continue with modified policy/actor if :cont tuple returned" do
       assert %Janus.Policy{} = ExamplePolicyWithHooks.policy_for(1)
       assert_received {:policy_for, %Janus.Policy{}, {:wrapped, 1}}
@@ -119,7 +128,7 @@ defmodule JanusTest do
     end
 
     test "raises on invalid return from hook" do
-      message = ~r"invalid return from hook `:invalid_if_3`"
+      message = ~r"invalid return from hook `"
 
       assert_raise(ArgumentError, message, fn ->
         ExamplePolicyWithHooks.policy_for(3)
