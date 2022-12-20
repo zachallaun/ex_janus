@@ -24,6 +24,21 @@ defmodule Janus do
     end
   end
 
+  @doc false
+  def any_authorized?(schema_or_query, action, policy) do
+    {_query, schema} = Janus.Utils.resolve_query_and_schema!(schema_or_query)
+
+    case Janus.Policy.rule_for(policy, action, schema) do
+      %{allow: []} -> false
+      _ -> true
+    end
+  end
+
+  @doc false
+  def filter_authorized(query_or_schema, action, policy, opts \\ []) do
+    Janus.Filter.filter(query_or_schema, action, policy, opts)
+  end
+
   defp allow_if_any?(true, _conditions, _policy, _object), do: true
 
   defp allow_if_any?(_, conditions, policy, object) do
@@ -89,20 +104,5 @@ defmodule Janus do
       value ->
         value
     end
-  end
-
-  @doc false
-  def any_authorized?(schema_or_query, action, policy) do
-    {_query, schema} = Janus.Utils.resolve_query_and_schema!(schema_or_query)
-
-    case Janus.Policy.rule_for(policy, action, schema) do
-      %{allow: []} -> false
-      _ -> true
-    end
-  end
-
-  @doc false
-  def filter_authorized(query_or_schema, action, policy, opts \\ []) do
-    Janus.Filter.filter(query_or_schema, action, policy, opts)
   end
 end
