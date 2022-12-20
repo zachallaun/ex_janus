@@ -29,19 +29,75 @@ defmodule Janus.Policy do
 
   The `policy_for/2` callback is the only callback that is required in policy modules.
 
-  ### Allow and forbid actions
+  ### `allow` and `forbid`
 
-  TODO: `allow/4` and `forbid/4` usage.
+  Permissions are primarily defined using `allow/4` and `forbid/4`, which allows or
+  forbids an action on a resource if a set of conditions match. Both functions take the
+  same arguments and options. When permissions are being checked, multiple `allow` rules
+  combine using logical-or, with `forbid` rules overriding `allow`.
 
-  #### Shared options
+  For example, the following policy would allow a moderator to edit their own comments
+  and any comments flagged for review, but not those made by an admin.
 
-    * `:where`
-    * `:where_not`
-    * `:or_where` (TODO, not yet implemented)
+      def policy_for(policy, %User{role: :moderator} = user) do
+        policy
+        |> allow(:edit, Comment, where: [user: [id: user.id]])
+        |> allow(:edit, Comment, where: [flagged_for_review: true])
+        |> forbid(:edit, Comment, where: [user: [role: :admin]])
+      end
 
-  #### Function overrides
+  While set of keyword options passed to `allow` and `forbid` are reminiscent of
+  keyword-based Ecto queries, but since they are functions and not macros, there is no
+  need to use the `^value` syntax used in Ecto. For example, the following would result
+  in an error:
 
-  TODO: arity-3 function to define dynamic or boolean for given attr
+      allow(policy, :edit, Comment, where: [user: [id: ^user.id]])
+
+  #### `:where` and `:where_not` conditions
+
+  These conditions match if the associated fields are equal to each other. For instance,
+  the moderation example above could also be represented as:
+
+      def policy_for(policy, %User{role: :moderator} = user) do
+        policy
+        |> allow(:edit, Comment, where: [user: [id: user.id]])
+        |> allow(:edit, Comment,
+          where: [flagged_for_review: true],
+          where_not: [user: [role: :admin]]
+        )
+      end
+
+  Multiple conditions within the same `allow`/`forbid` are combined with a logical-and,
+  so this might be translated to English as "allow moderators to edit comments they made
+  or to edit comments flagged for review that were not made by an admin".
+
+  #### Using function "escape-hatches"
+
+  In some cases, simple equality is not sufficient to represent a permission. For
+  instance, a `published_at` field might be used to schedule posts. Users may only have
+  permission to read posts where `published_at` is in the past, but we can only check
+  for equality using the basic keyword syntax presented above. In these cases, you can
+  defer this check using an arity-3 function:
+
+      def policy_for(policy, user) do
+        policy
+        |> allow(:read, Post, where: [published_at: &in_the_past?/3])
+      end
+
+      def in_the_past?(:boolean, record, :published_at) do
+        if value = Map.get(record, :published_at) do
+          DateTime.compare(DateTime.utc_now(), value) == :gt
+        end
+      end
+
+      def in_the_past?(:dynamic, binding, :published_at) do
+        now = DateTime.utc_now()
+        Ecto.Query.dynamic(^now > as(^binding).published_at)
+      end
+
+  As seen in the example above, functions must define at least two clauses based on their
+  first argument, `:boolean` or `:dynamic`, so that they can handle both operations on
+  a single record and operations that should compose with an Ecto query.
 
   ## Using policies
 
