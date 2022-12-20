@@ -41,11 +41,11 @@ defmodule Janus.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:ecto, github: "elixir-ecto/ecto", override: true},
+      {:ecto, "~> 3.9"},
       {:ecto_sql, "~> 3.9", only: [:test, :dev]},
       {:postgrex, "~> 0.16", only: :test},
       {:jason, "~> 1.4", only: :test},
-      {:ex_doc, only: :dev, runtime: false}
+      {:ex_doc, "0.29.1", only: :dev, runtime: false}
     ]
   end
 
