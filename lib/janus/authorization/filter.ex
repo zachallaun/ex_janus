@@ -198,17 +198,13 @@ defmodule Janus.Authorization.Filter do
 
   defp simplify_and(false, _), do: false
   defp simplify_and(_, false), do: false
-  defp simplify_and(nil, clause), do: clause
   defp simplify_and(true, clause), do: clause
-  defp simplify_and(clause, nil), do: clause
   defp simplify_and(clause, true), do: clause
   defp simplify_and(clause1, clause2), do: dynamic(^clause1 and ^clause2)
 
   defp simplify_or(true, _), do: true
   defp simplify_or(_, true), do: true
-  defp simplify_or(nil, clause), do: clause
   defp simplify_or(false, clause), do: clause
-  defp simplify_or(clause, nil), do: clause
   defp simplify_or(clause, false), do: clause
   defp simplify_or(clause1, clause2), do: dynamic(^clause1 or ^clause2)
 
