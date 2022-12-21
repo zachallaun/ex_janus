@@ -334,6 +334,18 @@ defmodule JanusTest do
       assert [%Thread{id: ^allowed_id}] =
                Auth.filter_authorized(Thread, :read, policy) |> Repo.all()
     end
+
+    test "should raise on filter if field value cannot be dumped to expected type" do
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Thread, where: [archived: "foo"])
+
+      message = ~r(could not dump "foo" to type :boolean)
+
+      assert_raise ArgumentError, message, fn ->
+        Auth.filter_authorized(Thread, :read, policy)
+      end
+    end
   end
 
   describe "function permissions" do
