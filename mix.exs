@@ -65,8 +65,7 @@ defmodule Janus.MixProject do
   defp package do
     [
       licenses: ["MIT"],
-      links: %{"GitHub" => @source_url},
-      files: ~w(.formatter.exs mix.exs README.md lib priv)
+      links: %{"GitHub" => @source_url}
     ]
   end
 

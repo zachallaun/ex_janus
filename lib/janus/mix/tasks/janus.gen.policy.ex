@@ -7,8 +7,8 @@ defmodule Mix.Tasks.Janus.Gen.Policy do
 
   Creates the following file:
 
-    * `lib/app_name/policy.ex` - A `Janus.Policy` module containing basic resource
-      loading and authorization helpers
+    * `lib/app_name/policy.ex` - A Janus policy module containing additional authorization
+      helpers
 
   ## Options
 

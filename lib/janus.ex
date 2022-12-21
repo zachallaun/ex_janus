@@ -107,7 +107,32 @@ defmodule Janus do
   @type schema :: atom()
   @type actor :: any()
 
-  @doc false
+  @doc """
+  Sets up a module to implement the `Janus.Policy` and `Janus.Authorization` behaviours.
+
+  Invoking `use Janus` does the following:
+
+    * invokes `use Janus.Policy` which imports functions for defining policies and
+      injects wrapper definitions for `policy_for/1` and `policy_for/2` that support
+      hooks (see `Janus.Policy` for more)
+    * injects implementations for the `Janus.Authorization` behaviour
+    * injects an overridable `__using__/1` that other modules in your application can
+      use to import just the `Janus.Authorization` API.
+
+  ## Example
+
+      defmodule MyApp.Policy do
+        use Janus
+
+        @impl true
+        def policy_for(policy, _actor) do
+          policy
+        end
+      end
+
+      # imports `authorize`, `filter_authorized`, and `any_authorized?`
+      use MyApp.Policy
+  """
   defmacro __using__(_opts) do
     quote location: :keep do
       @behaviour Janus.Authorization

@@ -25,7 +25,8 @@ defmodule Janus.Authorization do
   Returns `{:ok, resource}` if authorized, otherwise `:error`.
 
   `c:authorize/4` can accept either an actor or a policy as its third argument. If an
-  actor is passed, `c:policy_for/2` will be used to get the policy for that actor.
+  actor is passed, `c:Janus.Policy.policy_for/2` will be used to get the policy for that
+  actor.
 
   ## Examples
 
@@ -45,7 +46,8 @@ defmodule Janus.Authorization do
   Checks whether any permissions are defined for the given schema, action, and actor.
 
   `c:any_authorized?/3` can accept either an actor or a policy as its third argument. If
-  an actor is passed, `c:policy_for/2` will be used to get the policy for that actor.
+  an actor is passed, `c:Janus.Policy.policy_for/2` will be used to get the policy for
+  that actor.
 
   This function is most useful in conjunction with `c:filter_authorized/4`, which builds
   an `Ecto` query that filters to only those resources the actor is authorized for. If
@@ -82,8 +84,9 @@ defmodule Janus.Authorization do
   @doc """
   Create an `%Ecto.Query{}` that results in only authorized records.
 
-  `c:filter_authorized?/3` can accept either an actor or a policy as its third argument.
-  If an actor is passed, `c:policy_for/2` will be used to get the policy for that actor.
+  `c:filter_authorized/4` can accept either an actor or a policy as its third argument.
+  If an actor is passed, `c:Janus.Policy.policy_for/2` will be used to get the policy for
+  that actor.
 
   Like the `Ecto.Query` API, this function can accept a schema as the first argument or a
   query, in which case it will compose with that query. If a query is passed, the

@@ -10,12 +10,12 @@ duplication of authorization logic.
 
 ## Installation
 
-Janus can be installed by adding `janus` to your list of dependencies in `mix.exs`:
+Janus is pre-0.1 and can be installed by adding `janus` as a git dependency in `mix.exs`:
 
 ```elixir
 def deps do
   [
-    {:janus, "~> 0.1.0"}
+    {:janus, github: "zachallaun/janus"}
   ]
 end
 ```
