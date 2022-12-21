@@ -31,7 +31,7 @@ defmodule Mix.Tasks.Janus.Gen.Policy do
 
   defp copy_from(source_dir, binding, mapping) do
     for {source_file, target} <- mapping do
-      source = Path.join(source_dir, source_file)
+      source = :janus |> Application.app_dir(source_dir) |> Path.join(source_file)
       Mix.Generator.create_file(target, EEx.eval_file(source, binding))
     end
   end
@@ -42,7 +42,7 @@ defmodule Mix.Tasks.Janus.Gen.Policy do
     opts
     |> Keyword.put_new_lazy(:module, &default_module/0)
     |> Keyword.update!(:module, &parse_module!/1)
-    |> Keyword.update!(:module, &module_to_string/1)
+    |> Keyword.update!(:module, &module_to_string!/1)
     |> Keyword.put_new_lazy(:path, &default_path/0)
     |> Keyword.put_new_lazy(:app_namespace, &app_namespace/0)
   end
@@ -55,7 +55,7 @@ defmodule Mix.Tasks.Janus.Gen.Policy do
     Module.concat(app_namespace(), Policy)
   end
 
-  defp module_to_string(module) do
+  defp module_to_string!(module) when is_atom(module) do
     case to_string(module) do
       "Elixir." <> module -> module
       module -> module
