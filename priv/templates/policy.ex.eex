@@ -3,7 +3,7 @@ defmodule <%= module %> do
   Provides authorization and loading for <%= app_namespace %> resources.
   """
 
-  use Janus.Policy
+  use Janus
   alias <%= app_namespace %>.Repo
 
   @impl true

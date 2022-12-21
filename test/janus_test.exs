@@ -12,7 +12,7 @@ defmodule JanusTest do
 
   describe "basic policy module" do
     defmodule ExamplePolicy do
-      use Janus.Policy
+      use Janus
 
       @impl true
       def policy_for(policy, _) do
@@ -63,7 +63,7 @@ defmodule JanusTest do
 
   describe "policy module with hooks" do
     defmodule ExamplePolicyWithHooks do
-      use Janus.Policy
+      use Janus
 
       before_policy_for __MODULE__
       before_policy_for {__MODULE__, :wrap_if_1}

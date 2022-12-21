@@ -2,24 +2,20 @@ defmodule Janus.Policy do
   @moduledoc """
   Define composable authorization policies for actors in your system.
 
-  Policy modules are created by invoking `use Janus.Policy` and are responsible for
-  defining policies for the actors in your system as well as the API that the rest of
-  your application may use to enforce those policies.
-
   A policy is a data structure created for an actor in your system that defines the
   schemas that actor can access, the actions they can take, and any restrictions to
-  the set of resources that can be accessed. These policies can be created explicitly by
-  calling `policy_for/2`, but they are also created implicitly by any function that
-  accepts an actor as an argument, e.g. `authorize/2`, `filter_authorized/4`, etc.
+  the set of resources that can be accessed. These policies are generally created
+  implicitly for actors passed to functions defined by `Janus.Authorization`, but they
+  can also be created (and cached) with `policy_for/2`.
 
   ## Defining policies
 
-  You can create a policy module yourself that invokes `use Janus.Policy`, or generate
-  one to start by running `mix janus.gen.policy`. You will end up with something similar
-  to this:
+  While you can create a policy module with `use Janus.Policy`, you will usually invoke
+  `use Janus` to create a module that implements both this and the `Janus.Authorization`
+  behaviour:
 
       defmodule MyApp.Policy do
-        use Janus.Policy
+        use Janus
 
         @impl true
         def policy_for(policy, _user) do
@@ -105,20 +101,7 @@ defmodule Janus.Policy do
   These hooks can be used to change the default (usually empty) policy or actor, or to
   prevent `c:policy_for/2` from being run altogether.
 
-  See the `before_policy_for/1` for more details.
-
-  ## Using policies
-
-  Policy modules expose a minimal API that can be used to authorize and load authorized
-  resources throughout the rest of your application.
-
-    * `c:authorize/4` - authorize an individual, already-loaded resource
-    * `c:filter_authorized/4` - construct an `Ecto` query for a schema that will filter
-      results to only those that are authorized
-    * `c:any_authorized?/3` - checks whether the given actor/policy has _any_ access to
-      the given schema for the given action
-
-  See the documentation for each callback above for additional details.
+  See `before_policy_for/1` for more details.
   """
 
   alias __MODULE__
@@ -139,169 +122,6 @@ defmodule Janus.Policy do
   """
   @callback policy_for(t, Janus.actor()) :: t
 
-  @doc """
-  Authorizes a loaded resource.
-
-  Returns `{:ok, resource}` if authorized, otherwise `:error`.
-
-  `c:authorize/4` can accept either an actor or a policy as its third argument. If an
-  actor is passed, `c:policy_for/2` will be used to get the policy for that actor.
-
-  ## Examples
-
-      iex> MyPolicy.authorize(resource, :read, actor)
-      {:ok, resource}
-
-      iex> MyPolicy.authorize(resource, :read, policy)
-      {:ok, resource}
-
-      iex> MyPolicy.authorize(resource, :delete, actor)
-      :error
-  """
-  @callback authorize(struct(), Janus.action(), Janus.actor() | t, keyword()) ::
-              {:ok, struct()} | :error
-
-  @doc """
-  Checks whether any permissions are defined for the given schema, action, and actor.
-
-  `c:any_authorized?/3` can accept either an actor or a policy as its third argument. If
-  an actor is passed, `c:policy_for/2` will be used to get the policy for that actor.
-
-  This function is most useful in conjunction with `c:filter_authorized/4`, which builds
-  an `Ecto` query that filters to only those resources the actor is authorized for. If
-  you run the resulting query and receive `[]`, it is not possible to determine whether
-  the result is empty because the actor wasn't authorized for _any_ resources or because
-  of other restrictions on the query.
-
-  For example, you might use the following pattern to load all the resources a user is
-  allowed to read that were inserted in the last day:
-
-      query = from(r in MyResource, where: r.inserted_at > from_now(-1, "day"))
-
-      if any_authorized?(query, :read, user) do
-        {:ok, filter_authorized(query, :read, user) |> Repo.all()}
-      else
-        :error
-      end
-
-  This would result in `{:ok, results}` if the user is authorized to read any resources,
-  even if the result set is empty, and would result in `:error` if the user isn't
-  authorized to read the resources at all.
-
-  ## Examples
-
-      iex> MyPolicy.any_authorized?(MyResource, :read, actor)
-      true
-
-      iex> MyPolicy.any_authorized?(MyResource, :delete, actor)
-      false
-  """
-  @callback any_authorized?(Janus.schema(), Janus.action(), Janus.actor() | t) :: boolean()
-
-  @doc """
-  Create an `%Ecto.Query{}` that results in only authorized records.
-
-  `c:filter_authorized?/3` can accept either an actor or a policy as its third argument.
-  If an actor is passed, `c:policy_for/2` will be used to get the policy for that actor.
-
-  Like the `Ecto.Query` API, this function can accept a schema as the first argument or a
-  query, in which case it will compose with that query. If a query is passed, the
-  appropriate schema will be derived from that query's source.
-
-      filter_authorized(MyResource, :read, user)
-
-      query = from(r in MyResource, where: r.inserted_at > from_ago(1, "day"))
-      filter_authorized(query, :read, user)
-
-  If the query specifies the source as a string, we cannot derive the schema. For
-  example, this will not work:
-
-      # Raises an ArgumentError
-      query = from(r in "my_resources", where: r.inserted_at > from_ago(1, "day"))
-      filter_authorized(query, :read, user)
-
-  ## Options
-
-    * `:preload_authorized` - Similar to `Ecto.Query.preload/3`, but only preloads those
-      associated records that are authorized. Note that this requires a database that
-      supports lateral joins. See "Preloading authorized associations" for more
-      information.
-
-  ## Preloading authorized associations
-
-  The `:preload_authorized` option can be used to preload associated records, but only
-  those that are authorized for the given actor. An additional query can be specified
-  for each preloaded association that will be run as if scoped to its parent row.
-
-  This can simplify certain queries dramatically. For instance, imagine a user search
-  interface that lists users along with their most recent comment. Naughty comments can
-  be hidden by moderators, but those hidden comments should still be visible if a
-  moderator is searching. Here's how that might be accomplished:
-
-      iex> last_comment = from(Comment, order_by: [desc: :inserted_at], limit: 1)
-
-      iex> User
-      ...> |> search(search_params)
-      ...> |> MyPolicy.filter_authorized(:read, current_user,
-      ...>   preload_authorized: [comments: last_comment]
-      ...> )
-      ...> |> Repo.all()
-      [%User{comments: [%Comment{}]}, %User{comments: [%Comment{}]}, ...]
-
-  Some things to note about this example:
-
-    * The `last_comment` query runs as if scoped to each user's comments. This means that
-      the `:limit` applies to each user's comments, not the entire set of comments.
-    * The comment will be the last inserted comment that is authorized to be read by the
-      `current_user`. Moderators may be able to see hidden comments, while normal users
-      may not.
-
-  It is also possible to nest authorized preloads. For instance, you could preload
-  comments and their associated post.
-
-      MyPolicy.filter_authorized(User, :read, current_user,
-        preload_authorized: [comments: :post]
-      )
-
-  This would load all comments. You could incorporate the `last_comment` query above by
-  specifying it as the first element of a tuple, followed by the list of inner preloads:
-
-      MyPolicy.filter_authorized(User, :read, current_user,
-        preload_authorized: [comments: {last_comment, [:post]}]
-      )
-
-  This would load only the latest comment as well as its associated post (assuming it too
-  is authorized to be read by `current_user`).
-
-  ## Examples
-
-      iex> MyPolicy.filter_authorized(MyResource, :read, actor)
-      %Ecto.Query{}
-
-      iex> MyPolicy.filter_authorized(MyResource, :read, actor) |> Repo.all()
-      [%MyResource{}, ...]
-
-      iex> MyResource
-      ...> |> MyPolicy.filter_authorized(:read, actor)
-      ...> |> order_by(inserted_at: :desc)
-      ...> |> limit(1)
-      ...> |> Repo.one()
-      %MyResource{}
-
-      iex> MyResource
-      ...> |> MyPolicy.filter_authorized(:read, actor,
-      ...>   preload_authorized: :other
-      ...> )
-      ...> |> Repo.all()
-      [%MyResource{other: %OtherResource{}}, ...]
-  """
-  @callback filter_authorized(
-              Ecto.Query.t() | Janus.schema(),
-              Janus.action(),
-              Janus.actor(),
-              keyword()
-            ) :: Ecto.Query.t()
-
   @janus_hooks :__janus_hooks__
 
   @doc false
@@ -311,51 +131,15 @@ defmodule Janus.Policy do
       @before_compile Janus.Policy
       Module.register_attribute(__MODULE__, unquote(@janus_hooks), accumulate: true)
 
-      require Janus
       import Janus.Policy, except: [rule_for: 3]
 
-      unquote(default_using())
+      @doc """
+      Returns the policy for the given actor.
 
-      @doc "Returns the policy for the given actor."
+      See `c:Janus.Policy.policy_for/2` for more information.
+      """
       def policy_for(%Janus.Policy{} = policy), do: policy
       def policy_for(actor), do: policy_for(%Janus.Policy{}, actor)
-
-      @impl true
-      def authorize(object, action, actor, opts \\ []) do
-        Janus.authorize(object, action, policy_for(actor), opts)
-      end
-
-      @impl true
-      def any_authorized?(schema, action, actor) do
-        Janus.any_authorized?(schema, action, policy_for(actor))
-      end
-
-      @impl true
-      def filter_authorized(query_or_schema, action, actor, opts \\ []) do
-        Janus.filter_authorized(query_or_schema, action, policy_for(actor), opts)
-      end
-    end
-  end
-
-  defp default_using do
-    quote unquote: false do
-      @doc false
-      defmacro __using__(_opts) do
-        quote do
-          require unquote(__MODULE__)
-
-          import unquote(__MODULE__),
-            only: [
-              authorize: 3,
-              authorize: 4,
-              any_authorized?: 3,
-              filter_authorized: 3,
-              filter_authorized: 4
-            ]
-        end
-      end
-
-      defoverridable __using__: 1
     end
   end
 
