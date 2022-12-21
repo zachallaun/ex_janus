@@ -623,4 +623,23 @@ defmodule JanusTest do
                Auth.filter_authorized(Thread, :read, policy) |> Repo.all()
     end
   end
+
+  describe "filter_authorized/4" do
+    test "should derive the schema source from a query" do
+      policy = %Janus.Policy{}
+
+      assert %Ecto.Query{} = Auth.filter_authorized(Thread, :read, policy)
+      assert %Ecto.Query{} = Auth.filter_authorized(Ecto.Query.from(Thread), :read, policy)
+
+      assert %Ecto.Query{} =
+               Auth.filter_authorized({Ecto.Query.from(Thread), Thread}, :read, policy)
+
+      message = ~r"could not resolve query and schema"
+
+      assert_raise ArgumentError, message, fn ->
+        Auth.filter_authorized("threads", :read, policy)
+        Auth.filter_authorized(Ecto.Query.from("threads"), :read, policy)
+      end
+    end
+  end
 end
