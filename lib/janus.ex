@@ -1,6 +1,6 @@
 defmodule Janus do
   @moduledoc """
-  Flexible and composable authorization for `Ecto.Schema`s.
+  Flexible and composable authorization for resources defined by an `Ecto.Schema`.
 
   Janus provides an API for defining authorization policies that can be used both as
   filters in Ecto queries and to authorize actions on loaded resources with minimal to no

@@ -22,7 +22,7 @@ defmodule Janus.MixProject do
       ],
 
       # Hex
-      description: "Authorization for Ecto schemas",
+      description: "Flexible and composable authorization for resources defined by Ecto schemas",
       package: package(),
 
       # Docs
