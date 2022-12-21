@@ -387,6 +387,24 @@ defmodule JanusTest do
       assert :error = Auth.authorize(p2, :read, policy)
       assert [%Post{id: ^p1_id}] = Auth.filter_authorized(Post, :read, policy) |> Repo.all()
     end
+
+    test "raise if incorrect arity is given" do
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Thread, where: [archived: fn -> :boom end])
+
+      thread = thread_fixture()
+
+      message = ~r"permission functions must take 3 arguments"
+
+      assert_raise ArgumentError, message, fn ->
+        Auth.authorize(thread, :read, policy)
+      end
+
+      assert_raise ArgumentError, message, fn ->
+        Auth.filter_authorized(Thread, :read, policy)
+      end
+    end
   end
 
   describe "association permissions" do

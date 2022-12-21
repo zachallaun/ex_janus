@@ -249,7 +249,7 @@ defmodule Janus.Authorization do
   end
 
   defp compare_field(_resource, _field, fun) when is_function(fun) do
-    raise "permission functions must have arity 3 (#{inspect(fun)})"
+    raise ArgumentError, "permission functions must take 3 arguments (#{inspect(fun)})"
   end
 
   defp compare_field(resource, field, value) do
@@ -259,7 +259,7 @@ defmodule Janus.Authorization do
   defp fetch_associated!(resource, field) do
     case Map.fetch!(resource, field) do
       %Ecto.Association.NotLoaded{} ->
-        raise "field #{inspect(field)} must be pre-loaded on #{inspect(resource)}"
+        raise ArgumentError, "field #{inspect(field)} must be pre-loaded on #{inspect(resource)}"
 
       value ->
         value

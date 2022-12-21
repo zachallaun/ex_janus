@@ -156,7 +156,7 @@ defmodule Janus.Authorization.Filter do
   end
 
   defp dynamic_compare(_filter, _field, fun) when is_function(fun) do
-    raise ArgumentError, "permission functions must have arity 3 (#{inspect(fun)})"
+    raise ArgumentError, "permission functions must take 3 arguments (#{inspect(fun)})"
   end
 
   defp dynamic_compare(filter, field, nil) do
