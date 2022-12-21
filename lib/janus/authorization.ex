@@ -259,7 +259,7 @@ defmodule Janus.Authorization do
   defp fetch_associated!(resource, field) do
     case Map.fetch!(resource, field) do
       %Ecto.Association.NotLoaded{} ->
-        raise ArgumentError, "field #{inspect(field)} must be pre-loaded on #{inspect(resource)}"
+        raise ArgumentError, "field #{inspect(field)} must be preloaded on #{inspect(resource)}"
 
       value ->
         value

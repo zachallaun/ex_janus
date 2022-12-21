@@ -438,6 +438,17 @@ defmodule JanusTest do
       assert {:ok, ^post} = Auth.authorize(post, :edit, policy)
       assert [_] = Auth.filter_authorized(Post, :edit, policy) |> Repo.all()
     end
+
+    test "raise if a required association is not loaded" do
+      policy = allow(%Janus.Policy{}, :read, Thread, where: [creator: [id: 1]])
+
+      thread = thread_fixture()
+      thread = Ecto.reset_fields(thread, [:creator])
+
+      assert_raise ArgumentError, ~r"field :creator must be preloaded", fn ->
+        Auth.authorize(thread, :read, policy)
+      end
+    end
   end
 
   describe ":preload_authorized" do
