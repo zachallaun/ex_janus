@@ -7,6 +7,7 @@ defmodule JanusTest do
   import Janus.Policy
   import JanusTest.Fixtures
 
+  alias Janus.Authorization, as: Auth
   alias JanusTest.Schemas.{Thread, Post, User}, warn: false
   alias JanusTest.{Forum, Repo}
 
@@ -146,11 +147,11 @@ defmodule JanusTest do
 
       query = Ecto.Query.from(Thread, limit: 1)
 
-      assert [_] = query |> Janus.filter_authorized(:read, policy) |> Repo.all()
+      assert [_] = query |> Auth.filter_authorized(:read, policy) |> Repo.all()
 
       query = Ecto.Query.from(Ecto.Query.subquery(query))
 
-      assert [_] = query |> Janus.filter_authorized(:read, policy) |> Repo.all()
+      assert [_] = query |> Auth.filter_authorized(:read, policy) |> Repo.all()
     end
   end
 
@@ -160,9 +161,9 @@ defmodule JanusTest do
         %Janus.Policy{}
         |> allow(:read, Thread)
 
-      assert Janus.any_authorized?(Thread, :read, policy)
-      refute Janus.any_authorized?(Thread, :edit, policy)
-      refute Janus.any_authorized?(Post, :read, policy)
+      assert Auth.any_authorized?(Thread, :read, policy)
+      refute Auth.any_authorized?(Thread, :edit, policy)
+      refute Auth.any_authorized?(Post, :read, policy)
     end
 
     test "should return false if a blanket forbid exists" do
@@ -171,14 +172,14 @@ defmodule JanusTest do
         |> allow(:read, Thread)
         |> forbid(:read, Thread)
 
-      refute Janus.any_authorized?(Thread, :read, policy)
+      refute Auth.any_authorized?(Thread, :read, policy)
 
       policy =
         %Janus.Policy{}
         |> forbid(:read, Thread)
         |> allow(:read, Thread)
 
-      refute Janus.any_authorized?(Thread, :read, policy)
+      refute Auth.any_authorized?(Thread, :read, policy)
     end
 
     test "should return true if a forbid is conditional on attribute match" do
@@ -187,14 +188,14 @@ defmodule JanusTest do
         |> allow(:read, Thread)
         |> forbid(:read, Thread, where: [archived: true])
 
-      assert Janus.any_authorized?(Thread, :read, policy)
+      assert Auth.any_authorized?(Thread, :read, policy)
     end
 
     test "should accept a query as first argument" do
       policy = %Janus.Policy{}
       query = Ecto.Query.order_by(Thread, desc: :inserted_at)
 
-      refute Janus.any_authorized?(query, :read, policy)
+      refute Auth.any_authorized?(query, :read, policy)
     end
   end
 
@@ -208,11 +209,11 @@ defmodule JanusTest do
       thread = thread_fixture()
       [post] = thread.posts
 
-      assert {:ok, ^thread} = Janus.authorize(thread, :read, policy)
-      assert {:ok, ^post} = Janus.authorize(post, :read, policy)
-      assert :error = Janus.authorize(thread, :other, policy)
-      assert :error = Janus.authorize(thread.creator, :read, policy)
-      assert [%Post{}] = Janus.filter_authorized(Post, :read, policy) |> Repo.all()
+      assert {:ok, ^thread} = Auth.authorize(thread, :read, policy)
+      assert {:ok, ^post} = Auth.authorize(post, :read, policy)
+      assert :error = Auth.authorize(thread, :other, policy)
+      assert :error = Auth.authorize(thread.creator, :read, policy)
+      assert [%Post{}] = Auth.filter_authorized(Post, :read, policy) |> Repo.all()
     end
 
     test "should override allow with forbid" do
@@ -223,8 +224,8 @@ defmodule JanusTest do
 
       thread = thread_fixture()
 
-      assert :error = Janus.authorize(thread, :ready, policy)
-      assert [] = Janus.filter_authorized(Post, :read, policy) |> Repo.all()
+      assert :error = Auth.authorize(thread, :ready, policy)
+      assert [] = Auth.filter_authorized(Post, :read, policy) |> Repo.all()
     end
   end
 
@@ -237,9 +238,9 @@ defmodule JanusTest do
       unarchived = thread_fixture()
       archived = thread_fixture() |> Thread.changeset(%{archived: true}) |> Repo.update!()
 
-      assert {:ok, ^unarchived} = Janus.authorize(unarchived, :read, policy)
-      assert :error = Janus.authorize(archived, :read, policy)
-      assert [%Thread{} = thread] = Janus.filter_authorized(Thread, :read, policy) |> Repo.all()
+      assert {:ok, ^unarchived} = Auth.authorize(unarchived, :read, policy)
+      assert :error = Auth.authorize(archived, :read, policy)
+      assert [%Thread{} = thread] = Auth.filter_authorized(Thread, :read, policy) |> Repo.all()
       assert thread.id == unarchived.id
     end
 
@@ -250,8 +251,8 @@ defmodule JanusTest do
 
       thread = thread_fixture()
 
-      assert {:ok, ^thread} = Janus.authorize(thread, :read, policy)
-      assert [%Thread{}] = Janus.filter_authorized(Thread, :read, policy) |> Repo.all()
+      assert {:ok, ^thread} = Auth.authorize(thread, :read, policy)
+      assert [%Thread{}] = Auth.filter_authorized(Thread, :read, policy) |> Repo.all()
     end
 
     test "should allow action if multiple :where attributes match" do
@@ -265,10 +266,10 @@ defmodule JanusTest do
 
       thread = thread_fixture(%{creator_id: user1.id})
 
-      assert {:ok, ^thread} = Janus.authorize(thread, :edit, policy1)
-      assert :error = Janus.authorize(thread, :edit, policy2)
-      assert [%Thread{}] = Janus.filter_authorized(Thread, :edit, policy1) |> Repo.all()
-      assert [] = Janus.filter_authorized(Thread, :edit, policy2) |> Repo.all()
+      assert {:ok, ^thread} = Auth.authorize(thread, :edit, policy1)
+      assert :error = Auth.authorize(thread, :edit, policy2)
+      assert [%Thread{}] = Auth.filter_authorized(Thread, :edit, policy1) |> Repo.all()
+      assert [] = Auth.filter_authorized(Thread, :edit, policy2) |> Repo.all()
     end
 
     test "should allow composition of :where and :where_not attributes" do
@@ -278,11 +279,11 @@ defmodule JanusTest do
         %Janus.Policy{}
         |> allow(:read, Thread, where: [archived: false], where_not: [id: unreadable.id])
 
-      assert {:ok, ^readable} = Janus.authorize(readable, :read, policy)
-      assert :error = Janus.authorize(unreadable, :read, policy)
+      assert {:ok, ^readable} = Auth.authorize(readable, :read, policy)
+      assert :error = Auth.authorize(unreadable, :read, policy)
 
       assert [%Thread{id: ^readable_id}] =
-               Janus.filter_authorized(Thread, :read, policy) |> Repo.all()
+               Auth.filter_authorized(Thread, :read, policy) |> Repo.all()
     end
 
     test "should forbid action if an allow is overriden" do
@@ -293,17 +294,17 @@ defmodule JanusTest do
 
       %{id: thread_id} = thread = thread_fixture()
 
-      assert {:ok, ^thread} = Janus.authorize(thread, :read, policy)
+      assert {:ok, ^thread} = Auth.authorize(thread, :read, policy)
 
       assert [%Thread{id: ^thread_id}] =
-               Janus.filter_authorized(Thread, :read, policy) |> Repo.all()
+               Auth.filter_authorized(Thread, :read, policy) |> Repo.all()
 
       forbidden = thread_fixture(%{archived: true})
 
-      assert :error = Janus.authorize(forbidden, :read, policy)
+      assert :error = Auth.authorize(forbidden, :read, policy)
 
       assert [%Thread{id: ^thread_id}] =
-               Janus.filter_authorized(Thread, :read, policy) |> Repo.all()
+               Auth.filter_authorized(Thread, :read, policy) |> Repo.all()
     end
 
     test "should dump values to the correct underlying type" do
@@ -314,9 +315,9 @@ defmodule JanusTest do
       [%{id: u1_id} = u1, u2] = [user_fixture(), user_fixture()]
       {:ok, u2} = u2 |> User.changeset(%{status: :banned}) |> Repo.update()
 
-      assert {:ok, ^u1} = Janus.authorize(u1, :read, policy)
-      assert :error = Janus.authorize(u2, :read, policy)
-      assert [%User{id: ^u1_id}] = Janus.filter_authorized(User, :read, policy) |> Repo.all()
+      assert {:ok, ^u1} = Auth.authorize(u1, :read, policy)
+      assert :error = Auth.authorize(u2, :read, policy)
+      assert [%User{id: ^u1_id}] = Auth.filter_authorized(User, :read, policy) |> Repo.all()
     end
 
     test "should allow comparisons to nil" do
@@ -327,11 +328,11 @@ defmodule JanusTest do
       %{id: allowed_id} = allowed = thread_fixture()
       not_allowed = thread_fixture(%{category: "anything"})
 
-      assert {:ok, ^allowed} = Janus.authorize(allowed, :read, policy)
-      assert :error = Janus.authorize(not_allowed, :read, policy)
+      assert {:ok, ^allowed} = Auth.authorize(allowed, :read, policy)
+      assert :error = Auth.authorize(not_allowed, :read, policy)
 
       assert [%Thread{id: ^allowed_id}] =
-               Janus.filter_authorized(Thread, :read, policy) |> Repo.all()
+               Auth.filter_authorized(Thread, :read, policy) |> Repo.all()
     end
   end
 
@@ -354,9 +355,9 @@ defmodule JanusTest do
       [%{id: t1_id} = t1, t2] = [thread_fixture(), thread_fixture()]
       {:ok, t2} = t2 |> Thread.changeset(%{archived: true}) |> Repo.update()
 
-      assert {:ok, ^t1} = Janus.authorize(t1, :read, policy)
-      assert :error = Janus.authorize(t2, :read, policy)
-      assert [%Thread{id: ^t1_id}] = Janus.filter_authorized(Thread, :read, policy) |> Repo.all()
+      assert {:ok, ^t1} = Auth.authorize(t1, :read, policy)
+      assert :error = Auth.authorize(t2, :read, policy)
+      assert [%Thread{id: ^t1_id}] = Auth.filter_authorized(Thread, :read, policy) |> Repo.all()
     end
 
     test "can be used for association attribute comparison" do
@@ -382,9 +383,9 @@ defmodule JanusTest do
       p1 = Repo.preload(p1, :thread)
       p2 = Repo.preload(p2, :thread)
 
-      assert {:ok, ^p1} = Janus.authorize(p1, :read, policy)
-      assert :error = Janus.authorize(p2, :read, policy)
-      assert [%Post{id: ^p1_id}] = Janus.filter_authorized(Post, :read, policy) |> Repo.all()
+      assert {:ok, ^p1} = Auth.authorize(p1, :read, policy)
+      assert :error = Auth.authorize(p2, :read, policy)
+      assert [%Post{id: ^p1_id}] = Auth.filter_authorized(Post, :read, policy) |> Repo.all()
     end
   end
 
@@ -396,14 +397,14 @@ defmodule JanusTest do
 
       post = post_fixture()
 
-      assert {:ok, ^post} = Janus.authorize(post, :read, policy)
-      assert [_, _] = Janus.filter_authorized(Post, :read, policy) |> Repo.all()
+      assert {:ok, ^post} = Auth.authorize(post, :read, policy)
+      assert [_, _] = Auth.filter_authorized(Post, :read, policy) |> Repo.all()
 
       _ = post.thread |> Thread.changeset(%{archived: true}) |> Repo.update!()
       post = Repo.preload(post, :thread, force: true)
 
-      assert :error = Janus.authorize(post, :read, policy)
-      assert [] = Janus.filter_authorized(Post, :read, policy) |> Repo.all()
+      assert :error = Auth.authorize(post, :read, policy)
+      assert [] = Auth.filter_authorized(Post, :read, policy) |> Repo.all()
     end
 
     test "should allow action if nested association :where attribute matches" do
@@ -416,8 +417,8 @@ defmodule JanusTest do
       %{posts: [post]} = thread_fixture(%{creator_id: user.id})
       post = Repo.preload(post, thread: :creator)
 
-      assert {:ok, ^post} = Janus.authorize(post, :edit, policy)
-      assert [_] = Janus.filter_authorized(Post, :edit, policy) |> Repo.all()
+      assert {:ok, ^post} = Auth.authorize(post, :edit, policy)
+      assert [_] = Auth.filter_authorized(Post, :edit, policy) |> Repo.all()
     end
   end
 
@@ -443,7 +444,7 @@ defmodule JanusTest do
       query =
         Post
         |> Ecto.Query.order_by(:id)
-        |> Janus.filter_authorized(:read, policy, preload_authorized: :thread)
+        |> Auth.filter_authorized(:read, policy, preload_authorized: :thread)
 
       assert [
                %Post{thread: %Thread{}},
@@ -460,7 +461,7 @@ defmodule JanusTest do
         %Janus.Policy{}
         |> allow(:read, User)
 
-      query = Janus.filter_authorized(User, :read, policy, preload_authorized: :threads)
+      query = Auth.filter_authorized(User, :read, policy, preload_authorized: :threads)
 
       assert [%User{threads: []}, %User{threads: []}, %User{threads: []}] = query |> Repo.all()
     end
@@ -471,7 +472,7 @@ defmodule JanusTest do
         |> allow(:read, Thread, where: [archived: false])
         |> allow(:read, Post, where: [archived: false, thread: allows(:read)])
 
-      query = Janus.filter_authorized(Post, :read, policy, preload_authorized: [thread: :posts])
+      query = Auth.filter_authorized(Post, :read, policy, preload_authorized: [thread: :posts])
 
       assert [
                %Post{thread: %Thread{posts: [%Post{}, %Post{}]}},
@@ -490,7 +491,7 @@ defmodule JanusTest do
       first_post_query = Ecto.Query.from(Post, order_by: :id, limit: 1)
 
       query =
-        Janus.filter_authorized(Thread, :read, policy,
+        Auth.filter_authorized(Thread, :read, policy,
           preload_authorized: [posts: first_post_query]
         )
 
@@ -511,7 +512,7 @@ defmodule JanusTest do
       first_post_query = Ecto.Query.from(Post, order_by: :id, limit: 1)
 
       query =
-        Janus.filter_authorized(User, :read, policy,
+        Auth.filter_authorized(User, :read, policy,
           preload_authorized: [threads: {first_thread_query, posts: first_post_query}]
         )
         |> Ecto.Query.order_by(:id)
@@ -533,15 +534,15 @@ defmodule JanusTest do
 
       thread = thread_fixture()
 
-      assert {:ok, ^thread} = Janus.authorize(thread, :read, policy)
-      assert {:ok, ^thread} = Janus.authorize(thread, :edit, policy)
-      assert [%Thread{}] = Janus.filter_authorized(Thread, :edit, policy) |> Repo.all()
+      assert {:ok, ^thread} = Auth.authorize(thread, :read, policy)
+      assert {:ok, ^thread} = Auth.authorize(thread, :edit, policy)
+      assert [%Thread{}] = Auth.filter_authorized(Thread, :edit, policy) |> Repo.all()
 
       thread = thread |> Thread.changeset(%{archived: true}) |> Repo.update!()
 
-      assert :error = Janus.authorize(thread, :read, policy)
-      assert :error = Janus.authorize(thread, :edit, policy)
-      assert [] = Janus.filter_authorized(Thread, :edit, policy) |> Repo.all()
+      assert :error = Auth.authorize(thread, :read, policy)
+      assert :error = Auth.authorize(thread, :edit, policy)
+      assert [] = Auth.filter_authorized(Thread, :edit, policy) |> Repo.all()
     end
 
     test "should allow action based on permission of an association" do
@@ -552,8 +553,8 @@ defmodule JanusTest do
 
       post = post_fixture()
 
-      assert {:ok, ^post} = Janus.authorize(post, :read, policy)
-      assert [_, _] = Janus.filter_authorized(Post, :read, policy) |> Repo.all()
+      assert {:ok, ^post} = Auth.authorize(post, :read, policy)
+      assert [_, _] = Auth.filter_authorized(Post, :read, policy) |> Repo.all()
     end
   end
 
@@ -566,19 +567,19 @@ defmodule JanusTest do
 
       %{id: thread_id} = thread = thread_fixture()
 
-      assert {:ok, ^thread} = Janus.authorize(thread, :read, policy)
-      assert {:ok, _thread} = Janus.authorize(%Thread{}, :create, policy)
+      assert {:ok, ^thread} = Auth.authorize(thread, :read, policy)
+      assert {:ok, _thread} = Auth.authorize(%Thread{}, :create, policy)
 
       assert [%Thread{id: ^thread_id}] =
-               Janus.filter_authorized(Thread, :read, policy) |> Repo.all()
+               Auth.filter_authorized(Thread, :read, policy) |> Repo.all()
 
       forbidden = thread_fixture(%{title: "forbidden"})
 
-      assert :error = Janus.authorize(forbidden, :read, policy)
-      assert :error = Janus.authorize(forbidden, :edit, policy)
+      assert :error = Auth.authorize(forbidden, :read, policy)
+      assert :error = Auth.authorize(forbidden, :edit, policy)
 
       assert [%Thread{id: ^thread_id}] =
-               Janus.filter_authorized(Thread, :read, policy) |> Repo.all()
+               Auth.filter_authorized(Thread, :read, policy) |> Repo.all()
     end
   end
 end

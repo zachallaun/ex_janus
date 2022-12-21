@@ -109,7 +109,7 @@ defmodule Janus.Policy do
 
   @type t :: %Policy{
           rules: %{
-            {Janus.schema(), Janus.action()} => Rule.t()
+            {Janus.schema_module(), Janus.action()} => Rule.t()
           }
         }
 
@@ -248,7 +248,7 @@ defmodule Janus.Policy do
       |> allow(:read, FirstResource)
       |> allow(:create, SecondResource, where: [creator: [id: user.id]])
   """
-  @spec allow(t, Janus.action() | [Janus.action()], Janus.schema(), keyword()) :: t
+  @spec allow(t, Janus.action() | [Janus.action()], Janus.schema_module(), keyword()) :: t
   def allow(policy, action, schema, opts \\ [])
 
   def allow(%Policy{} = policy, actions, schema, opts) when is_list(actions) do
@@ -273,7 +273,7 @@ defmodule Janus.Policy do
       |> allow(:read, FirstResource)
       |> forbid(:read, FirstResource, where: [scope: :private])
   """
-  @spec forbid(t, Janus.action(), Janus.schema(), keyword()) :: t
+  @spec forbid(t, Janus.action(), Janus.schema_module(), keyword()) :: t
   def forbid(policy, action, schema, opts \\ [])
 
   def forbid(%Policy{} = policy, actions, schema, opts) when is_list(actions) do
@@ -319,11 +319,10 @@ defmodule Janus.Policy do
       |> allow(:read, Post, where: [archived: false], where_not: [published_at: nil])
       |> allow(:read, Comment, where: [post: allows(:read)])
   """
-  @spec allows(Janus.action()) :: tuple()
-  def allows(action), do: {:__janus_derived__, action}
+  def allows(action), do: {:__derived_allow__, action}
 
   @doc false
-  @spec rule_for(t, Janus.action(), Janus.schema()) :: Rule.t()
+  @spec rule_for(t, Janus.action(), Janus.schema_module()) :: Rule.t()
   def rule_for(%Policy{rules: rules}, action, schema) do
     Map.get_lazy(rules, {schema, action}, fn ->
       Rule.new(schema, action)

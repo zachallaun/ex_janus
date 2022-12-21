@@ -1,15 +1,15 @@
-defmodule Janus.Filter do
+defmodule Janus.Authorization.Filter do
   @moduledoc false
 
   import Ecto.Query
-  alias Janus.Filter
+  alias __MODULE__
 
   @root_binding :__object__
 
   @type t :: %Filter{
           policy: Janus.Policy.t(),
           action: Janus.action(),
-          schema: Janus.schema(),
+          schema: Janus.schema_module(),
           binding: atom(),
           parent_binding: atom(),
           dynamic: Ecto.Query.dynamic(),
@@ -19,7 +19,7 @@ defmodule Janus.Filter do
   defstruct [:policy, :action, :schema, :binding, :parent_binding, :dynamic, joins: []]
 
   defimpl Ecto.Queryable do
-    def to_query(filter), do: Janus.Filter.to_query(filter)
+    def to_query(filter), do: Filter.to_query(filter)
   end
 
   @doc """
@@ -55,7 +55,7 @@ defmodule Janus.Filter do
     {query, schema} = Janus.Utils.resolve_query_and_schema!(query_or_schema)
     rule = Janus.Policy.rule_for(policy, action, schema)
 
-    base_filter = %Janus.Filter{
+    base_filter = %Filter{
       policy: policy,
       action: action,
       schema: schema,
@@ -132,7 +132,7 @@ defmodule Janus.Filter do
     end
   end
 
-  defp apply_clause({:__janus_derived__, action}, filter) do
+  defp apply_clause({:__derived_allow__, action}, filter) do
     subquery = filter(filter.schema, action, filter.policy)
     %{filter | joins: merge_joins(filter.joins, __subquery__: {subquery, filter.binding})}
   end

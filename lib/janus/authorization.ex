@@ -1,53 +1,38 @@
 defmodule Janus.Authorization do
   @moduledoc """
-  Behaviour for using policy modules to authorize and load resources.
+  Authorize and load resources using policies.
 
   Policy modules expose a minimal API that can be used to authorize and load resources
   throughout the rest of your application.
 
-    * `c:authorize/4` - authorize an individual, already-loaded resource
-    * `c:filter_authorized/4` - construct an `Ecto` query for a schema that will filter
+    * `authorize/4` - authorize an individual, already-loaded resource
+    * `filter_authorized/4` - construct an `Ecto` query for a schema that will filter
       results to only those that are authorized
-    * `c:any_authorized?/3` - checks whether the given actor/policy has _any_ access to
+    * `any_authorized?/3` - checks whether the given actor/policy has _any_ access to
       the given schema for the given action
 
-  Definitions for these callbacks are generally injected into your policy module that
-  invoked `use Janus`.
+  These functions will usually be called from your policy module directly, since wrappers
+  that accept either a policy or an actor are injected when you invoke `use Janus`.
+  Documentation examples will show usage from your policy module.
 
-  See the callback documentation for additional details and usage.
+  See individual function documentation for details.
   """
 
   alias Janus.Policy
 
-  @doc """
-  Authorizes a loaded resource.
+  @type filterable :: Janus.schema_module() | Ecto.Query.t()
 
-  Returns `{:ok, resource}` if authorized, otherwise `:error`.
+  @callback authorize(Ecto.Schema.t(), Janus.action(), Janus.actor() | Policy.t(), keyword()) ::
+              {:ok, Ecto.Schema.t()} | :error
 
-  `c:authorize/4` can accept either an actor or a policy as its third argument. If an
-  actor is passed, `c:Janus.Policy.policy_for/2` will be used to get the policy for that
-  actor.
+  @callback any_authorized?(filterable, Janus.action(), Janus.actor() | Policy.t()) ::
+              boolean()
 
-  ## Examples
-
-      iex> MyPolicy.authorize(resource, :read, actor)
-      {:ok, resource}
-
-      iex> MyPolicy.authorize(resource, :read, policy)
-      {:ok, resource}
-
-      iex> MyPolicy.authorize(resource, :delete, actor)
-      :error
-  """
-  @callback authorize(struct(), Janus.action(), Janus.actor() | Policy.t(), keyword()) ::
-              {:ok, struct()} | :error
+  @callback filter_authorized(filterable, Janus.action(), Janus.actor() | Policy.t(), keyword()) ::
+              Ecto.Query.t()
 
   @doc """
   Checks whether any permissions are defined for the given schema, action, and actor.
-
-  `c:any_authorized?/3` can accept either an actor or a policy as its third argument. If
-  an actor is passed, `c:Janus.Policy.policy_for/2` will be used to get the policy for
-  that actor.
 
   This function is most useful in conjunction with `c:filter_authorized/4`, which builds
   an `Ecto` query that filters to only those resources the actor is authorized for. If
@@ -78,15 +63,18 @@ defmodule Janus.Authorization do
       iex> MyPolicy.any_authorized?(MyResource, :delete, actor)
       false
   """
-  @callback any_authorized?(Janus.schema(), Janus.action(), Janus.actor() | Policy.t()) ::
-              boolean()
+  @spec any_authorized?(filterable, Janus.action(), Policy.t()) :: boolean()
+  def any_authorized?(schema_or_query, action, policy) do
+    {_query, schema} = Janus.Utils.resolve_query_and_schema!(schema_or_query)
+
+    case Janus.Policy.rule_for(policy, action, schema) do
+      %{allow: []} -> false
+      _ -> true
+    end
+  end
 
   @doc """
   Create an `%Ecto.Query{}` that results in only authorized records.
-
-  `c:filter_authorized/4` can accept either an actor or a policy as its third argument.
-  If an actor is passed, `c:Janus.Policy.policy_for/2` will be used to get the policy for
-  that actor.
 
   Like the `Ecto.Query` API, this function can accept a schema as the first argument or a
   query, in which case it will compose with that query. If a query is passed, the
@@ -179,10 +167,102 @@ defmodule Janus.Authorization do
       ...> |> Repo.all()
       [%MyResource{other: %OtherResource{}}, ...]
   """
-  @callback filter_authorized(
-              Ecto.Query.t() | Janus.schema(),
-              Janus.action(),
-              Janus.actor() | Policy.t(),
-              keyword()
-            ) :: Ecto.Query.t()
+  @spec filter_authorized(filterable, Janus.action(), Policy.t(), keyword()) :: Ecto.Query.t()
+  def filter_authorized(query_or_schema, action, policy, opts \\ []) do
+    Janus.Authorization.Filter.filter(query_or_schema, action, policy, opts)
+  end
+
+  @doc """
+  Authorizes a loaded resource.
+
+  Expects to receive a struct, an action, and an actor or policy.
+
+  Returns `{:ok, resource}` if authorized, otherwise `:error`.
+
+  ## Examples
+
+      iex> MyPolicy.authorize(%MyResource{}, :read, actor) # accepts an actor
+      {:ok, %MyResource{}}
+
+      iex> MyPolicy.authorize(%MyResource{}, :read, policy) # or a policy
+      {:ok, %MyResource{}}
+
+      iex> MyPolicy.authorize(%MyResource{}, :delete, actor)
+      :error
+  """
+  @spec authorize(Ecto.Schema.t(), Janus.action(), Policy.t(), keyword()) ::
+          {:ok, Ecto.Schema.t()} | :error
+  def authorize(%schema{} = resource, action, policy, _opts \\ []) do
+    rule = Janus.Policy.rule_for(policy, action, schema)
+
+    allow_if_any?(rule.allow, policy, resource)
+    |> forbid_if_any?(rule.forbid, policy, resource)
+    |> case do
+      true -> {:ok, resource}
+      false -> :error
+    end
+  end
+
+  defp allow_if_any?(allowed? \\ false, conditions, policy, resource) do
+    allowed? || Enum.any?(conditions, &condition_match?(&1, policy, resource))
+  end
+
+  defp forbid_if_any?(allowed?, conditions, policy, resource) do
+    allowed? && !Enum.any?(conditions, &condition_match?(&1, policy, resource))
+  end
+
+  defp condition_match?([], _policy, _resource), do: true
+
+  defp condition_match?(condition, policy, resource) when is_list(condition) do
+    Enum.all?(condition, &condition_match?(&1, policy, resource))
+  end
+
+  defp condition_match?({:where, clause}, policy, resource) do
+    clause_match?(clause, policy, resource)
+  end
+
+  defp condition_match?({:where_not, clause}, policy, resource) do
+    !clause_match?(clause, policy, resource)
+  end
+
+  defp clause_match?(list, policy, resource) when is_list(list) do
+    Enum.all?(list, &clause_match?(&1, policy, resource))
+  end
+
+  defp clause_match?({:__derived_allow__, action}, policy, resource) do
+    case authorize(resource, action, policy) do
+      {:ok, _} -> true
+      :error -> false
+    end
+  end
+
+  defp clause_match?({field, value}, policy, %schema{} = resource) do
+    if field in schema.__schema__(:associations) do
+      clause_match?(value, policy, fetch_associated!(resource, field))
+    else
+      compare_field(resource, field, value)
+    end
+  end
+
+  defp compare_field(resource, field, fun) when is_function(fun, 3) do
+    fun.(:boolean, resource, field)
+  end
+
+  defp compare_field(_resource, _field, fun) when is_function(fun) do
+    raise "permission functions must have arity 3 (#{inspect(fun)})"
+  end
+
+  defp compare_field(resource, field, value) do
+    Map.get(resource, field) == value
+  end
+
+  defp fetch_associated!(resource, field) do
+    case Map.fetch!(resource, field) do
+      %Ecto.Association.NotLoaded{} ->
+        raise "field #{inspect(field)} must be pre-loaded on #{inspect(resource)}"
+
+      value ->
+        value
+    end
+  end
 end

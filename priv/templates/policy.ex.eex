@@ -1,8 +1,7 @@
 defmodule <%= module %> do
   @moduledoc """
-  Provides authorization and loading for <%= app_namespace %> resources.
+  Authorization for <%= app_namespace %> resources.
   """
-
   use Janus
   alias <%= app_namespace %>.Repo
 

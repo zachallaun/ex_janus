@@ -77,7 +77,7 @@ defmodule Janus do
   were injected by default when we invoked `use Janus`. This is the "public API" that the
   rest of your application will use to authorize resources.
 
-  See the `Janus.Authorization` documentation for more on authorization.
+  See the `Janus.Authorization` documentation for more.
 
   ## Integration with `Ecto`
 
@@ -104,7 +104,7 @@ defmodule Janus do
   require Ecto.Query
 
   @type action :: any()
-  @type schema :: atom()
+  @type schema_module :: module()
   @type actor :: any()
 
   @doc """
@@ -144,17 +144,17 @@ defmodule Janus do
 
       @impl Janus.Authorization
       def authorize(resource, action, actor, opts \\ []) do
-        Janus.authorize(resource, action, policy_for(actor), opts)
+        Janus.Authorization.authorize(resource, action, policy_for(actor), opts)
       end
 
       @impl Janus.Authorization
       def any_authorized?(schema, action, actor) do
-        Janus.any_authorized?(schema, action, policy_for(actor))
+        Janus.Authorization.any_authorized?(schema, action, policy_for(actor))
       end
 
       @impl Janus.Authorization
       def filter_authorized(query_or_schema, action, actor, opts \\ []) do
-        Janus.filter_authorized(query_or_schema, action, policy_for(actor), opts)
+        Janus.Authorization.filter_authorized(query_or_schema, action, policy_for(actor), opts)
       end
     end
   end
@@ -176,101 +176,6 @@ defmodule Janus do
       end
 
       defoverridable __using__: 1
-    end
-  end
-
-  @doc false
-  def authorize(%schema{} = object, action, policy, _opts \\ []) do
-    rule = Janus.Policy.rule_for(policy, action, schema)
-
-    false
-    |> allow_if_any?(rule.allow, policy, object)
-    |> forbid_if_any?(rule.forbid, policy, object)
-    |> case do
-      true -> {:ok, object}
-      false -> :error
-    end
-  end
-
-  @doc false
-  def any_authorized?(schema_or_query, action, policy) do
-    {_query, schema} = Janus.Utils.resolve_query_and_schema!(schema_or_query)
-
-    case Janus.Policy.rule_for(policy, action, schema) do
-      %{allow: []} -> false
-      _ -> true
-    end
-  end
-
-  @doc false
-  def filter_authorized(query_or_schema, action, policy, opts \\ []) do
-    Janus.Filter.filter(query_or_schema, action, policy, opts)
-  end
-
-  defp allow_if_any?(true, _conditions, _policy, _object), do: true
-
-  defp allow_if_any?(_, conditions, policy, object) do
-    Enum.any?(conditions, &condition_match?(&1, policy, object))
-  end
-
-  defp forbid_if_any?(false, _conditions, _policy, _object), do: false
-
-  defp forbid_if_any?(_, conditions, policy, object) do
-    !Enum.any?(conditions, &condition_match?(&1, policy, object))
-  end
-
-  defp condition_match?([], _policy, _object), do: true
-
-  defp condition_match?(condition, policy, object) when is_list(condition) do
-    Enum.all?(condition, &condition_match?(&1, policy, object))
-  end
-
-  defp condition_match?({:where, clause}, policy, object) do
-    clause_match?(clause, policy, object)
-  end
-
-  defp condition_match?({:where_not, clause}, policy, object) do
-    !clause_match?(clause, policy, object)
-  end
-
-  defp clause_match?(list, policy, object) when is_list(list) do
-    Enum.all?(list, &clause_match?(&1, policy, object))
-  end
-
-  defp clause_match?({:__janus_derived__, action}, policy, object) do
-    case authorize(object, action, policy) do
-      {:ok, _} -> true
-      :error -> false
-    end
-  end
-
-  defp clause_match?({field, value}, policy, %schema{} = object) do
-    if field in schema.__schema__(:associations) do
-      clause_match?(value, policy, fetch_associated!(object, field))
-    else
-      compare_field(object, field, value)
-    end
-  end
-
-  defp compare_field(object, field, fun) when is_function(fun, 3) do
-    fun.(:boolean, object, field)
-  end
-
-  defp compare_field(_object, _field, fun) when is_function(fun) do
-    raise "permission functions must have arity 3 (#{inspect(fun)})"
-  end
-
-  defp compare_field(object, field, value) do
-    Map.get(object, field) == value
-  end
-
-  defp fetch_associated!(object, field) do
-    case Map.fetch!(object, field) do
-      %Ecto.Association.NotLoaded{} ->
-        raise "field #{inspect(field)} must be pre-loaded on #{inspect(object)}"
-
-      value ->
-        value
     end
   end
 end

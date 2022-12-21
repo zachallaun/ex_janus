@@ -4,10 +4,10 @@ defmodule Janus.Policy.Rule do
   """
 
   @type t :: %__MODULE__{
-          schema: Janus.schema(),
+          schema: Janus.schema_module(),
           action: Janus.action(),
-          allow: [keyword()],
-          forbid: [keyword()]
+          allow: [keyword() | boolean()],
+          forbid: [keyword() | boolean()]
         }
 
   defstruct [

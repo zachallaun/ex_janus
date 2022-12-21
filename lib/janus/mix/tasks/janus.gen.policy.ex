@@ -37,10 +37,12 @@ defmodule Mix.Tasks.Janus.Gen.Policy do
   end
 
   defp parse_args(args) do
-    args
-    |> OptionParser.parse!(strict: [module: :string, path: :string])
+    {opts, []} = OptionParser.parse!(args, strict: [module: :string, path: :string])
+
+    opts
     |> Keyword.put_new_lazy(:module, &default_module/0)
     |> Keyword.update!(:module, &parse_module!/1)
+    |> Keyword.update!(:module, &module_to_string/1)
     |> Keyword.put_new_lazy(:path, &default_path/0)
     |> Keyword.put_new_lazy(:app_namespace, &app_namespace/0)
   end
@@ -51,6 +53,13 @@ defmodule Mix.Tasks.Janus.Gen.Policy do
 
   defp default_module do
     Module.concat(app_namespace(), Policy)
+  end
+
+  defp module_to_string(module) do
+    case to_string(module) do
+      "Elixir." <> module -> module
+      module -> module
+    end
   end
 
   defp parse_module!(module) when is_atom(module) do

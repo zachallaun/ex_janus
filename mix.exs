@@ -20,6 +20,7 @@ defmodule Janus.MixProject do
         "ecto.rollback": :test,
         "ecto.create": :test
       ],
+      dialyzer: dialyzer(),
 
       # Hex
       description: "Flexible and composable authorization for resources defined by Ecto schemas",
@@ -42,10 +43,13 @@ defmodule Janus.MixProject do
   defp deps do
     [
       {:ecto, "~> 3.9"},
-      {:ecto_sql, "~> 3.9", only: [:test, :dev]},
-      {:postgrex, "~> 0.16", only: :test},
-      {:jason, "~> 1.4", only: :test},
-      {:ex_doc, "0.29.1", only: :dev, runtime: false}
+
+      # dev/test
+      {:ex_doc, "0.29.1", only: :dev, runtime: false},
+      {:dialyxir, "~> 1.2", only: [:dev, :test], runtime: false},
+      {:ecto_sql, "~> 3.9", only: [:dev, :test]},
+      {:jason, "~> 1.4", only: [:dev, :test]},
+      {:postgrex, "~> 0.16", only: :test}
     ]
   end
 
@@ -81,6 +85,18 @@ defmodule Janus.MixProject do
       ],
       groups_for_extras: [
         Cheatsheets: ~r/cheatsheets\/.?/
+      ]
+    ]
+  end
+
+  defp dialyzer do
+    [
+      plt_file: {:no_warn, "priv/plts/dialyzer.plt"},
+      plt_add_apps: [:mix],
+      flags: [
+        :underspecs,
+        :extra_return,
+        :missing_return
       ]
     ]
   end
