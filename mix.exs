@@ -13,14 +13,20 @@ defmodule Janus.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
+      dialyzer: dialyzer(),
+      test_coverage: [tool: ExCoveralls],
       preferred_cli_env: [
+        t: :test,
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test,
         "ecto.setup": :test,
         "ecto.gen.migration": :test,
         "ecto.migrate": :test,
         "ecto.rollback": :test,
         "ecto.create": :test
       ],
-      dialyzer: dialyzer(),
 
       # Hex
       description: "Flexible and composable authorization for resources defined by Ecto schemas",
@@ -46,6 +52,7 @@ defmodule Janus.MixProject do
 
       # dev/test
       {:ex_doc, "0.29.1", only: :dev, runtime: false},
+      {:excoveralls, "~> 0.15", only: :test},
       {:dialyxir, "~> 1.2", only: [:dev, :test], runtime: false},
       {:ecto_sql, "~> 3.9", only: [:dev, :test]},
       {:jason, "~> 1.4", only: [:dev, :test]},
@@ -58,6 +65,7 @@ defmodule Janus.MixProject do
 
   defp aliases do
     [
+      t: "coveralls",
       "ecto.setup": [
         "ecto.drop",
         "ecto.create",
