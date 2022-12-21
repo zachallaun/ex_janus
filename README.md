@@ -6,16 +6,16 @@ Janus provides an API for defining authorization policies that can be used both 
 filters in Ecto queries and to authorize actions on loaded resources with minimal to no
 duplication of authorization logic.
 
-[**Documentation**](https://hexdocs.pm/janus)
+[**Documentation**](https://hexdocs.pm/ex_janus/Janus.html)
 
 ## Installation
 
-Janus is pre-0.1 and can be installed by adding `janus` as a git dependency in `mix.exs`:
+Janus is pre-0.1 and can be installed by adding `ex_janus` as a git dependency in `mix.exs`:
 
 ```elixir
 def deps do
   [
-    {:janus, github: "zachallaun/janus"}
+    {:ex_janus, github: "zachallaun/ex_janus"}
   ]
 end
 ```

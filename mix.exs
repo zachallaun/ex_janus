@@ -1,7 +1,7 @@
 defmodule Janus.MixProject do
   use Mix.Project
 
-  @source_url "https://github.com/zachallaun/janus"
+  @source_url "https://github.com/zachallaun/ex_janus"
   @version "0.1.0-dev"
 
   def project do
@@ -64,6 +64,7 @@ defmodule Janus.MixProject do
 
   defp package do
     [
+      name: "ex_janus",
       licenses: ["MIT"],
       links: %{"GitHub" => @source_url}
     ]
@@ -71,10 +72,11 @@ defmodule Janus.MixProject do
 
   defp docs do
     [
-      main: "Janus",
+      main: "readme",
       source_url: @source_url,
       extra_section: "GUIDES",
       extras: [
+        "README.md",
         "cheatsheets/defining_policies.cheatmd"
       ],
       groups_for_extras: [
