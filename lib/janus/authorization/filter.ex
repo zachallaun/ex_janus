@@ -109,7 +109,13 @@ defmodule Janus.Authorization.Filter do
 
   defp apply_condition({:where_not, clause}, filter) do
     %{dynamic: dynamic} = filter = apply_clause(clause, filter)
-    %{filter | dynamic: dynamic(not (^dynamic))}
+    %{filter | dynamic: simplify_not(dynamic)}
+  end
+
+  defp apply_condition({:or, cond1, conditions}, filter) do
+    %{dynamic: d1} = filter = apply_condition(cond1, filter)
+    %{dynamic: d2} = filter = apply_condition(conditions, filter)
+    %{filter | dynamic: simplify_or(d1, d2)}
   end
 
   defp apply_condition([], filter) do

@@ -329,6 +329,34 @@ defmodule Janus.AuthorizationTest do
         Auth.authorize(thread, :read, policy)
       end
     end
+
+    test "should allow associations in subsequent clauses" do
+      t1 = thread_fixture()
+      %{id: t2_id} = t2 = thread_fixture()
+
+      p1 =
+        %Janus.Policy{}
+        |> allow(:read, Thread,
+          where: [archived: false],
+          where_not: [creator: [id: t1.creator_id]]
+        )
+
+      assert :error = Auth.authorize(t1, :read, p1)
+      assert {:ok, ^t2} = Auth.authorize(t2, :read, p1)
+      assert [%Thread{id: ^t2_id}] = Auth.filter_authorized(Thread, :read, p1) |> Repo.all()
+
+      p2 =
+        %Janus.Policy{}
+        |> allow(:read, Thread,
+          where: [archived: false],
+          where_not: [creator: [id: t1.creator_id]],
+          where_not: [creator: [id: t2.creator_id]]
+        )
+
+      assert :error = Auth.authorize(t1, :read, p2)
+      assert :error = Auth.authorize(t2, :read, p2)
+      assert [] = Auth.filter_authorized(Thread, :read, p2) |> Repo.all()
+    end
   end
 
   describe ":preload_authorized" do

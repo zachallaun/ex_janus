@@ -17,7 +17,7 @@ defmodule Janus.Policy.Rule do
     forbid: []
   ]
 
-  @valid_options [:where, :where_not]
+  @valid_options [:where, :where_not, :or_where]
 
   @doc false
   def new(schema, action) do
@@ -47,7 +47,7 @@ defmodule Janus.Policy.Rule do
   defp parse_opts!(opts) do
     with {:keyword, true} <- {:keyword, Keyword.keyword?(opts)},
          [] <- opts |> Keyword.keys() |> Enum.uniq() |> Kernel.--(@valid_options) do
-      opts
+      combine(opts)
     else
       {:keyword, false} -> invalid_opts!(opts)
       opts -> invalid_opts!(opts)
@@ -57,4 +57,16 @@ defmodule Janus.Policy.Rule do
   defp invalid_opts!(value) do
     raise ArgumentError, "invalid options passed to `allow` or `forbid`: `#{inspect(value)}`"
   end
+
+  defp combine(opts, acc \\ [])
+
+  defp combine([{:or_where, or_clause} | opts], acc) do
+    combine(opts, [{:or, {:where, or_clause}, acc}])
+  end
+
+  defp combine([clause | opts], acc) do
+    combine(opts, [clause | acc])
+  end
+
+  defp combine([], acc), do: Enum.reverse(acc)
 end

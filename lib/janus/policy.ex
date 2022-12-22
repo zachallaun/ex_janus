@@ -8,7 +8,7 @@ defmodule Janus.Policy do
   implicitly for actors passed to functions defined by `Janus.Authorization`, but they
   can also be created (and cached) with `policy_for/2`.
 
-  ## Defining policies
+  ## Policy modules
 
   While you can create a policy module with `use Janus.Policy`, you will usually invoke
   `use Janus` to create a module that implements both this and the `Janus.Authorization`
@@ -25,7 +25,7 @@ defmodule Janus.Policy do
 
   The `policy_for/2` callback is the only callback that is required in policy modules.
 
-  ### `allow` and `forbid`
+  ## Using `allow` and `forbid`
 
   Permissions are primarily defined using `allow/4` and `forbid/4`, which allows or
   forbids an action on a resource if a set of conditions match. Both functions take the
@@ -49,14 +49,14 @@ defmodule Janus.Policy do
 
       allow(policy, :edit, Comment, where: [user: [id: ^user.id]])
 
-  #### `:where` and `:where_not` conditions
+  ### `:where` and `:where_not` conditions
 
   These conditions match if the associated fields are equal to each other. For instance,
-  the moderation example above could also be represented as:
+  the moderation example above could also be written as:
 
       def policy_for(policy, %User{role: :moderator} = user) do
         policy
-        |> allow(:edit, Comment, where: [user: [id: user.id]])
+        |> allow(:edit, Comment, where: [user_id: user.id])
         |> allow(:edit, Comment,
           where: [flagged_for_review: true],
           where_not: [user: [role: :admin]]
@@ -67,11 +67,42 @@ defmodule Janus.Policy do
   so this might be translated to English as "allow moderators to edit comments they made
   or to edit comments flagged for review that were not made by an admin".
 
-  #### Using function "escape-hatches"
+  ### `:or_where` conditions
 
-  In some cases, simple equality is not sufficient to represent a permission. For
-  instance, a `published_at` field might be used to schedule posts. Users may only have
-  permission to read posts where `published_at` is in the past, but we can only check
+  You can also use `:or_where` to combine with all previous conditions. For instance, the
+  two examples above could also be written as:
+
+      def policy_for(policy, %User{role: :moderator} = user) do
+        policy
+        |> allow(:edit, Comment,
+          where: [flagged_for_review: true],
+          where_not: [user: [role: :admin]],
+          or_where: [user_id: user.id]
+        )
+      end
+
+  An `:or_where` condition applies to all clauses before it. Using some pseudocode for
+  demonstration, the above would read:
+
+      # (flagged_for_review AND NOT user.role == :admin) OR user_id == user.id
+
+  These clauses could be reordered to have a different meaning:
+
+      policy
+      |> allow(:edit, Comment,
+        where: [flagged_for_review: true],
+        or_where: [user_id: user.id],
+        where_not: [user: [role: :admin]]
+      )
+
+      # (flagged_for_review OR user_id == user.id) AND NOT user.role == :admin
+
+  ### Attribute checks with functions
+
+  When equality is not a sufficient check for an attribute, a function can be supplied.
+
+  For instance, a `published_at` field might be used to schedule posts. Users may only
+  have permission to read posts where `published_at` is in the past, but we can only check
   for equality using the basic keyword syntax presented above. In these cases, you can
   defer this check using an arity-3 function:
 
@@ -95,7 +126,7 @@ defmodule Janus.Policy do
   first argument, `:boolean` or `:dynamic`, so that they can handle both operations on
   a single record and operations that should compose with an Ecto query.
 
-  ### `before_policy_for` hooks
+  ## `before_policy_for` hooks
 
   You can register hooks to be run prior to `c:policy_for/2` using `before_policy_for/1`.
   These hooks can be used to change the default (usually empty) policy or actor, or to
@@ -266,7 +297,9 @@ defmodule Janus.Policy do
   end
 
   @doc """
-  Allows an action on the schema if matched by opts.
+  Allows an action on the schema if matched by conditions.
+
+  See the section on "Using allow and forbid" for a description of conditions.
 
   ## Examples
 
@@ -291,7 +324,9 @@ defmodule Janus.Policy do
   end
 
   @doc """
-  Forbids an action on the schema if matched by opts.
+  Forbids an action on the schema if matched by conditions.
+
+  See the section on "Using allow and forbid" for a description of conditions.
 
   ## Examples
 

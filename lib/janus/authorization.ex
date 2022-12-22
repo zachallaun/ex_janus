@@ -204,11 +204,15 @@ defmodule Janus.Authorization do
   end
 
   defp allow_if_any?(allowed? \\ false, conditions, policy, resource) do
-    allowed? || Enum.any?(conditions, &condition_match?(&1, policy, resource))
+    allowed? || any_conditions_match?(conditions, policy, resource)
   end
 
   defp forbid_if_any?(allowed?, conditions, policy, resource) do
-    allowed? && !Enum.any?(conditions, &condition_match?(&1, policy, resource))
+    allowed? && !any_conditions_match?(conditions, policy, resource)
+  end
+
+  defp any_conditions_match?(conditions, policy, resource) do
+    Enum.any?(conditions, &condition_match?(&1, policy, resource))
   end
 
   defp condition_match?([], _policy, _resource), do: true
@@ -223,6 +227,10 @@ defmodule Janus.Authorization do
 
   defp condition_match?({:where_not, clause}, policy, resource) do
     !clause_match?(clause, policy, resource)
+  end
+
+  defp condition_match?({:or, cond1, conditions}, policy, resource) do
+    condition_match?(cond1, policy, resource) || condition_match?(conditions, policy, resource)
   end
 
   defp clause_match?(list, policy, resource) when is_list(list) do
