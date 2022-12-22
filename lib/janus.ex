@@ -116,8 +116,6 @@ defmodule Janus do
       injects wrapper definitions for `policy_for/1` and `policy_for/2` that support
       hooks (see `Janus.Policy` for more)
     * injects implementations for the `Janus.Authorization` behaviour
-    * injects an overridable `__using__/1` that other modules in your application can
-      use to import just the `Janus.Authorization` API.
 
   ## Example
 
@@ -140,8 +138,6 @@ defmodule Janus do
       use Janus.Policy
       require Janus
 
-      unquote(default_using())
-
       @impl Janus.Authorization
       def authorize(resource, action, actor, opts \\ []) do
         Janus.Authorization.authorize(resource, action, policy_for(actor), opts)
@@ -156,26 +152,6 @@ defmodule Janus do
       def filter_authorized(query_or_schema, action, actor, opts \\ []) do
         Janus.Authorization.filter_authorized(query_or_schema, action, policy_for(actor), opts)
       end
-    end
-  end
-
-  defp default_using do
-    quote unquote: false do
-      @doc false
-      defmacro __using__(_opts) do
-        quote do
-          import unquote(__MODULE__),
-            only: [
-              authorize: 3,
-              authorize: 4,
-              any_authorized?: 3,
-              filter_authorized: 3,
-              filter_authorized: 4
-            ]
-        end
-      end
-
-      defoverridable __using__: 1
     end
   end
 end
