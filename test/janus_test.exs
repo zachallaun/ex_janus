@@ -1,11 +1,10 @@
 defmodule JanusTest do
   use Janus.DataCase
 
-  require Ecto.Query
-
   require Janus
   import Janus.Policy
   import JanusTest.Fixtures
+  import Ecto.Query
 
   alias Janus.Authorization, as: Auth
   alias JanusTest.Schemas.{Thread, Post, User}, warn: false
@@ -32,7 +31,6 @@ defmodule JanusTest do
     end
 
     test "defines authorized/3 accepting a first-argument schema" do
-      require ExamplePolicy
       _ = [thread_fixture(), thread_fixture(), thread_fixture()]
       query = ExamplePolicy.filter_authorized(Thread, :read, :user)
 
@@ -41,12 +39,11 @@ defmodule JanusTest do
     end
 
     test "defines authorized/3 accepting a first-argument query" do
-      require ExamplePolicy
       _ = [thread_fixture(), thread_fixture(), thread_fixture()]
 
       query =
         Thread
-        |> Ecto.Query.limit(1)
+        |> limit(1)
         |> ExamplePolicy.filter_authorized(:read, :user)
 
       assert [_] = Repo.all(query)
@@ -136,11 +133,11 @@ defmodule JanusTest do
         %Janus.Policy{}
         |> allow(:read, Thread)
 
-      query = Ecto.Query.from(Thread, limit: 1)
+      query = from(Thread, limit: 1)
 
       assert [_] = query |> Auth.filter_authorized(:read, policy) |> Repo.all()
 
-      query = Ecto.Query.from(Ecto.Query.subquery(query))
+      query = from(subquery(query))
 
       assert [_] = query |> Auth.filter_authorized(:read, policy) |> Repo.all()
     end
@@ -184,7 +181,7 @@ defmodule JanusTest do
 
     test "should accept a query as first argument" do
       policy = %Janus.Policy{}
-      query = Ecto.Query.order_by(Thread, desc: :inserted_at)
+      query = order_by(Thread, desc: :inserted_at)
 
       refute Auth.any_authorized?(query, :read, policy)
     end
@@ -350,7 +347,7 @@ defmodule JanusTest do
                 !record.archived
 
               :dynamic, binding, :archived ->
-                Ecto.Query.dynamic(not as(^binding).archived)
+                dynamic(not as(^binding).archived)
             end
           ]
         )
@@ -374,7 +371,7 @@ defmodule JanusTest do
                   !record.archived
 
                 :dynamic, binding, :archived ->
-                  Ecto.Query.dynamic(not as(^binding).archived)
+                  dynamic(not as(^binding).archived)
               end
             ]
           ]
@@ -475,7 +472,7 @@ defmodule JanusTest do
 
       query =
         Post
-        |> Ecto.Query.order_by(:id)
+        |> order_by(:id)
         |> Auth.filter_authorized(:read, policy, preload_authorized: :thread)
 
       assert [
@@ -520,7 +517,7 @@ defmodule JanusTest do
         |> allow(:read, Thread, where: [archived: false])
         |> allow(:read, Post, where: [archived: false, thread: allows(:read)])
 
-      first_post_query = Ecto.Query.from(Post, order_by: :id, limit: 1)
+      first_post_query = from(Post, order_by: :id, limit: 1)
 
       query =
         Auth.filter_authorized(Thread, :read, policy,
@@ -540,14 +537,14 @@ defmodule JanusTest do
         |> allow(:read, Thread, where: [archived: false])
         |> allow(:read, Post, where: [archived: false, thread: allows(:read)])
 
-      first_thread_query = Ecto.Query.from(Thread, order_by: :id, limit: 1)
-      first_post_query = Ecto.Query.from(Post, order_by: :id, limit: 1)
+      first_thread_query = from(Thread, order_by: :id, limit: 1)
+      first_post_query = from(Post, order_by: :id, limit: 1)
 
       query =
         Auth.filter_authorized(User, :read, policy,
           preload_authorized: [threads: {first_thread_query, posts: first_post_query}]
         )
-        |> Ecto.Query.order_by(:id)
+        |> order_by(:id)
 
       assert [
                %User{threads: [%Thread{posts: [%Post{content: "t1 post"}]}]},
@@ -640,16 +637,14 @@ defmodule JanusTest do
       policy = %Janus.Policy{}
 
       assert %Ecto.Query{} = Auth.filter_authorized(Thread, :read, policy)
-      assert %Ecto.Query{} = Auth.filter_authorized(Ecto.Query.from(Thread), :read, policy)
-
-      assert %Ecto.Query{} =
-               Auth.filter_authorized({Ecto.Query.from(Thread), Thread}, :read, policy)
+      assert %Ecto.Query{} = Auth.filter_authorized(from(Thread), :read, policy)
+      assert %Ecto.Query{} = Auth.filter_authorized({from(Thread), Thread}, :read, policy)
 
       message = ~r"could not resolve query and schema"
 
       assert_raise ArgumentError, message, fn ->
         Auth.filter_authorized("threads", :read, policy)
-        Auth.filter_authorized(Ecto.Query.from("threads"), :read, policy)
+        Auth.filter_authorized(from("threads"), :read, policy)
       end
     end
   end
