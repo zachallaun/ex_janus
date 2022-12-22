@@ -22,11 +22,14 @@ end
 
 ## Development
 
-Steps to set up `Janus` locally:
+To set up and test `Janus` locally:
 
 ```bash
-$ git clone https://github.com/zachallaun/janus && cd janus
+$ git clone https://github.com/zachallaun/ex_janus && cd ex_janus
+
 $ mix deps.get
-$ mix ecto.setup
-$ mix test
+
+# Set up test database and run tests with code coverage report
+$ mix setup
+$ mix t
 ```

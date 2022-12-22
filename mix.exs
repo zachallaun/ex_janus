@@ -15,18 +15,7 @@ defmodule Janus.MixProject do
       aliases: aliases(),
       dialyzer: dialyzer(),
       test_coverage: [tool: ExCoveralls],
-      preferred_cli_env: [
-        t: :test,
-        coveralls: :test,
-        "coveralls.detail": :test,
-        "coveralls.post": :test,
-        "coveralls.html": :test,
-        "ecto.setup": :test,
-        "ecto.gen.migration": :test,
-        "ecto.migrate": :test,
-        "ecto.rollback": :test,
-        "ecto.create": :test
-      ],
+      preferred_cli_env: preferred_cli_env(),
 
       # Hex
       description: "Flexible and composable authorization for resources defined by Ecto schemas",
@@ -66,12 +55,29 @@ defmodule Janus.MixProject do
   defp aliases do
     [
       t: "coveralls",
-      "ecto.setup": [
+      setup: [
         "ecto.drop",
         "ecto.create",
         "ecto.migrate --migrations-path test/support/janus_test/migrations"
       ]
     ]
+  end
+
+  defp preferred_cli_env do
+    test_tasks = [
+      :t,
+      :setup,
+      :coveralls,
+      :"coveralls.detail",
+      :"coveralls.post",
+      :"coveralls.html",
+      :"ecto.gen.migration",
+      :"ecto.migrate",
+      :"ecto.rollback",
+      :"ecto.create"
+    ]
+
+    for task <- test_tasks, do: {task, :test}
   end
 
   defp package do
