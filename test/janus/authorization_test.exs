@@ -463,7 +463,7 @@ defmodule Janus.AuthorizationTest do
   end
 
   describe "derived permissions" do
-    test "should allow action based on other permissions" do
+    test "allows/1 in allow/4" do
       policy =
         %Janus.Policy{}
         |> allow(:read, Thread, where: [archived: false])
@@ -482,7 +482,7 @@ defmodule Janus.AuthorizationTest do
       assert [] = Auth.filter_authorized(Thread, :edit, policy) |> Repo.all()
     end
 
-    test "should allow action based on permission of an association" do
+    test "allows/1 in allow/4 with associations" do
       policy =
         %Janus.Policy{}
         |> allow(:read, Thread, where: [archived: false])

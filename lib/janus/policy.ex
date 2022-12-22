@@ -351,11 +351,20 @@ defmodule Janus.Policy do
   end
 
   @doc """
-  Specifies that an association should match if the association's schema is authorized.
+  Specifies that a condition should match if another action is allowed.
 
-  This allows authorization to be "delegated" to an association.
+  If used as the value for an association, the condition will match if the action is
+  allowed for the association.
 
   ## Example
+
+  Allow users to edit any posts they can delete.
+
+      policy
+      |> allow(:delete, Post, where: [user_id: user.id])
+      |> allow(:edit, Post, where: allows(:delete))
+
+  ## Example with associations
 
   Let's say we have some posts with comments. Posts are visible unless they are archived,
   and all comments of visible posts are also visible. To start, we can duplicate the
