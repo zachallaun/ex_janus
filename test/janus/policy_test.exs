@@ -5,6 +5,22 @@ defmodule Janus.PolicyTest do
   alias Janus.Authorization, as: Auth
 
   describe "allow/4 and forbid/4" do
+    test "raises on unknown conditions" do
+      message = "invalid options passed to `allow` or `forbid`: `[:foo]`"
+
+      assert_raise ArgumentError, message, fn ->
+        allow(%Janus.Policy{}, :read, Thread, foo: :bar)
+      end
+
+      assert_raise ArgumentError, message, fn ->
+        allow(%Janus.Policy{}, :read, Thread, where: [archived: false], foo: :bar)
+      end
+
+      assert_raise ArgumentError, message, fn ->
+        allow(%Janus.Policy{}, :read, Thread, [:foo])
+      end
+    end
+
     test "should accept a list of actions" do
       policy =
         %Janus.Policy{}
