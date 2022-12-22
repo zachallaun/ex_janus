@@ -91,46 +91,133 @@ defmodule Comment do
 end
 ```
 
-## Defining policies
+## Core concepts
+{: .col-2}
+
+### Schemas
+
+Schemas are modules that invoke `use Ecto.Schema` and are used to identify different resources in your application.
+
+#### When defining policies
+
+```elixir
+policy
+|> allow(:edit, Post, ...)
+#               ^^^^
+```
+
+#### When generating a query
+
+```elixir
+Policy.filter_authorized(Post, :edit, current_user)
+#                        ^^^^
+```
+
+#### When checking whether any auth rules are defined
+
+```elixir
+Policy.any_authorized?(Post, :edit, current_user)
+#                      ^^^^
+```
+
+### Resources
+
+Resources are loaded structs defined by one of your schemas.
+
+#### When authorizing an action
+
+```elixir
+Policy.authorize(%Post{}, :edit, current_user)
+#                ^^^^^^^
+```
+
+### Actors
+
+Actors are the users of your application.
+They can be a `%User{}` struct, but they don't have to be.
+Actors are converted to a policy using `policy_for/2`, so an actor can be anything that you want to use to differentiate between types of user.
+They can even be a simple atom like `:normal_user` or `:admin_user`.
+
+#### In `policy_for/2`
+
+```elixir
+def policy_for(policy, %User{}) do
+  #                    ^^^^^^^
+end
+```
+
+#### When calling any authorization function
+
+```elixir
+Policy.authorize(%Post{}, :edit, current_user)
+#                                ^^^^^^^^^^^^
+```
+
+### Actions
+
+Actions are what actors _do to_ resources in your application.
+Janus doesn't care how you represent actions, but atoms usually do the trick.
+
+#### When defining policies
+
+```elixir
+policy
+|> allow(:edit, Post, ...)
+#        ^^^^^
+```
+
+#### When calling any authorization function
+
+```elixir
+Policy.authorize(%Post{}, :edit, current_user)
+#                         ^^^^^
+```
+
+#### Can be any term (except a list)
+
+```elixir
+policy
+|> allow(:edit, Post, ...)
+|> allow("edit", Post, ...)
+|> allow(%Action{type: :edit}, Post, ...)
+# lists are special-cased to allow multiple actions to share conditions
+|> allow([:read, :edit], Post, ...)
+```
+
+## Permitting actions
 {: .col-2}
 
 ### Grant permission for all resources of schema
 
 ```elixir
-def policy_for(policy, %User{role: :admin}) do
-  policy
-  |> allow(:read, Post)
-  |> allow(:edit, Post)
-  |> allow(:archive, Post)
-  |> allow(:read, Comment)
-  |> allow(:edit, Comment)
-end
+policy
+|> allow(:read, Post)
+|> allow(:edit, Post)
+|> allow(:archive, Post)
+|> allow(:read, Comment)
+|> allow(:edit, Comment)
 ```
 
 ### Using lists of actions
 
 ```elixir
-def policy_for(policy, %User{role: :admin}) do
-  policy
-  |> allow([:read, :edit, :archive], Post)
-  |> allow([:read, :edit], Comment)
-end
+policy
+|> allow([:read, :edit, :archive], Post)
+|> allow([:read, :edit], Comment)
 ```
 
 ### Grant permission based on resource attributes
 
 ```elixir
-def policy_for(policy, %User{role: :member} = user) do
-  policy
-  |> allow(:read, Post, where: [archived: false])
+policy
+|> allow(:read, Post, where: [archived: false])
 
-  # or define using :where_not
-  |> allow(:read, Post, where_not: [archived: true])
+# or define using :where_not
+|> allow(:read, Post, where_not: [archived: true])
 
-  # or override a blanket permission using forbid
-  |> allow(:read, Post)
-  |> forbid(:read, Post, where: [archived: true])
-end
+# or override a blanket permission using forbid
+|> allow(:read, Post)
+|> forbid(:read, Post, where: [archived: true])
 ```
 
 ### Grant permission if the user is associated with the resource
@@ -145,53 +232,58 @@ end
 ### Grant permission based on association attributes
 
 ```elixir
-def policy_for(policy, %User{role: :moderator} = user) do
-  policy
-  |> allow(:edit, Comment, where: [user: [role: :member]])
-end
+policy
+|> allow(:edit, Comment, where: [user: [role: :member]])
 ```
 
 ### Use `allows` to delegate permission to an association
 
 ```elixir
-def policy_for(policy, %User{role: :member} = user) do
-  policy
-  |> allow(:read, Post, where: [archived: false])
-  |> allow(:read, Comment, where: [post: allows(:read)])
-end
+policy
+|> allow(:read, Post, where: [archived: false])
+|> allow(:read, Comment, where: [post: allows(:read)])
 ```
 
 ### Multiple `allow` combines as a logical-or
 
 ```elixir
-# This will always let the user read all posts since
-# the first `allow` combines as an "or" clause with
-# the second.
-def policy_for(policy, %User{role: :member} = user) do
-  policy
-  |> allow(:read, Post)
-  |> allow(:read, Post, where: [archived: false]) # has no effect
-end
+# This will always allow reading all posts
+policy
+|> allow(:read, Post)
+|> allow(:read, Post, where: [archived: false]) # has no effect
 ```
 
 ### Use `forbid` to override a previous `allow`
 
 ```elixir
-def policy_for(policy, %User{role: :member} = user) do
-  policy
-  |> allow(:read, Post)
-  |> forbid(:read, Post, where: [archived: true])
-end
+policy
+|> allow(:read, Post)
+|> forbid(:read, Post, where: [archived: true])
 ```
 
-### Define actions using strings
+## Structuring your policy definition
+{: .col-2}
 
-You can use atoms or strings to represent actions. Strings may be useful if allowed actions are stored in an array or map in your database.
+### Pattern-match to give different permissions to different actors
 
 ```elixir
+def policy_for(policy, %User{role: :member}) do
+  # member permissions
+end
+
 def policy_for(policy, %User{role: :moderator}) do
-  policy
-  |> allow("read", Post)
-  |> allow("archive", Post, where: [user: [role: :member]])
+  # moderator permissions
 end
 ```
+
+### Delegate to context-specific policies
+
+```elixir
+def policy_for(policy, actor) do
+  policy
+  |> CommunityForum.Policy.policy_for(actor)
+  |> Storefront.Policy.policy_for(actor)
+end
+```
+
+For larger applications with well-defined boundaries, a policy can be constructed by threading it through multiple `policy_for` calls.
