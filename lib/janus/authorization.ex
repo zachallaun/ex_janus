@@ -195,23 +195,22 @@ defmodule Janus.Authorization do
   def authorize(%schema{} = resource, action, policy, _opts \\ []) do
     rule = Janus.Policy.rule_for(policy, action, schema)
 
-    allow_if_any?(rule.allow, policy, resource)
-    |> deny_if_any?(rule.deny, policy, resource)
-    |> case do
-      true -> {:ok, resource}
-      false -> :error
-    end
+    {:ok, resource}
+    |> run_conditions(rule.allow, policy, :ok_if_any)
+    |> run_conditions(rule.deny, policy, :error_if_any)
   end
 
-  defp allow_if_any?(allowed? \\ false, conditions, policy, resource) do
-    allowed? || any_conditions_match?(conditions, policy, resource)
+  defp run_conditions({:ok, resource}, conditions, policy, :ok_if_any) do
+    if any_conditions_match?(resource, conditions, policy), do: {:ok, resource}, else: :error
   end
 
-  defp deny_if_any?(allowed?, conditions, policy, resource) do
-    allowed? && !any_conditions_match?(conditions, policy, resource)
+  defp run_conditions({:ok, resource}, conditions, policy, :error_if_any) do
+    if any_conditions_match?(resource, conditions, policy), do: :error, else: {:ok, resource}
   end
 
-  defp any_conditions_match?(conditions, policy, resource) do
+  defp run_conditions(:error, _conditions, _policy, _), do: :error
+
+  defp any_conditions_match?(resource, conditions, policy) do
     Enum.any?(conditions, &condition_match?(&1, policy, resource))
   end
 
