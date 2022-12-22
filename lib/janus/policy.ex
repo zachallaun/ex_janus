@@ -25,12 +25,12 @@ defmodule Janus.Policy do
 
   The `policy_for/2` callback is the only callback that is required in policy modules.
 
-  ## Using `allow` and `forbid`
+  ## Using `allow` and `deny`
 
-  Permissions are primarily defined using `allow/4` and `forbid/4`, which allows or
-  forbids an action on a resource if a set of conditions match. Both functions take the
+  Permissions are primarily defined using `allow/4` and `deny/4`, which allows or
+  denies an action on a resource if a set of conditions match. Both functions take the
   same arguments and options. When permissions are being checked, multiple `allow` rules
-  combine using logical-or, with `forbid` rules overriding `allow`.
+  combine using logical-or, with `deny` rules overriding `allow`.
 
   For example, the following policy would allow a moderator to edit their own comments
   and any comments flagged for review, but not those made by an admin.
@@ -39,10 +39,10 @@ defmodule Janus.Policy do
         policy
         |> allow(:edit, Comment, where: [user: [id: user.id]])
         |> allow(:edit, Comment, where: [flagged_for_review: true])
-        |> forbid(:edit, Comment, where: [user: [role: :admin]])
+        |> deny(:edit, Comment, where: [user: [role: :admin]])
       end
 
-  While set of keyword options passed to `allow` and `forbid` are reminiscent of
+  While set of keyword options passed to `allow` and `deny` are reminiscent of
   keyword-based Ecto queries, but since they are functions and not macros, there is no
   need to use the `^value` syntax used in Ecto. For example, the following would result
   in an error:
@@ -63,7 +63,7 @@ defmodule Janus.Policy do
         )
       end
 
-  Multiple conditions within the same `allow`/`forbid` are combined with a logical-and,
+  Multiple conditions within the same `allow`/`deny` are combined with a logical-and,
   so this might be translated to English as "allow moderators to edit comments they made
   or to edit comments flagged for review that were not made by an admin".
 
@@ -299,7 +299,7 @@ defmodule Janus.Policy do
   @doc """
   Allows an action on the schema if matched by conditions.
 
-  See the section on "Using allow and forbid" for a description of conditions.
+  See the section on "Using allow and deny" for a description of conditions.
 
   ## Examples
 
@@ -324,29 +324,29 @@ defmodule Janus.Policy do
   end
 
   @doc """
-  Forbids an action on the schema if matched by conditions.
+  Denies an action on the schema if matched by conditions.
 
-  See the section on "Using allow and forbid" for a description of conditions.
+  See the section on "Using allow and deny" for a description of conditions.
 
   ## Examples
 
       policy
       |> allow(:read, FirstResource)
-      |> forbid(:read, FirstResource, where: [scope: :private])
+      |> deny(:read, FirstResource, where: [scope: :private])
   """
-  @spec forbid(t, Janus.action(), Janus.schema_module(), keyword()) :: t
-  def forbid(policy, action, schema, opts \\ [])
+  @spec deny(t, Janus.action(), Janus.schema_module(), keyword()) :: t
+  def deny(policy, action, schema, opts \\ [])
 
-  def forbid(%Policy{} = policy, actions, schema, opts) when is_list(actions) do
+  def deny(%Policy{} = policy, actions, schema, opts) when is_list(actions) do
     Enum.reduce(actions, policy, fn action, policy ->
-      forbid(policy, action, schema, opts)
+      deny(policy, action, schema, opts)
     end)
   end
 
-  def forbid(%Policy{} = policy, action, schema, opts) do
+  def deny(%Policy{} = policy, action, schema, opts) do
     policy
     |> rule_for(action, schema)
-    |> Rule.forbid(opts)
+    |> Rule.deny(opts)
     |> put_rule(policy)
   end
 

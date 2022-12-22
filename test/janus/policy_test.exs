@@ -4,9 +4,9 @@ defmodule Janus.PolicyTest do
   import Janus.Policy
   alias Janus.Authorization, as: Auth
 
-  describe "allow/4 and forbid/4" do
+  describe "allow/4 and deny/4" do
     test "raises on unknown conditions" do
-      message = "invalid options passed to `allow` or `forbid`: `[:foo]`"
+      message = "invalid options passed to `allow` or `deny`: `[:foo]`"
 
       assert_raise ArgumentError, message, fn ->
         allow(%Janus.Policy{}, :read, Thread, foo: :bar)
@@ -38,7 +38,7 @@ defmodule Janus.PolicyTest do
       p2 =
         %Janus.Policy{}
         |> allow(:read, Thread)
-        |> forbid(:read, Thread, where: [archived: false], or_where: [id: t2_id])
+        |> deny(:read, Thread, where: [archived: false], or_where: [id: t2_id])
 
       assert {:ok, ^t1} = Auth.authorize(t1, :read, p2)
       assert :error = Auth.authorize(t2, :read, p2)
@@ -97,7 +97,7 @@ defmodule Janus.PolicyTest do
       policy =
         %Janus.Policy{}
         |> allow([:read, :create], Thread)
-        |> forbid([:read, :edit], Thread, where: [title: "forbidden"])
+        |> deny([:read, :edit], Thread, where: [title: "denied"])
 
       %{id: thread_id} = thread = thread_fixture()
 
@@ -107,10 +107,10 @@ defmodule Janus.PolicyTest do
       assert [%Thread{id: ^thread_id}] =
                Auth.filter_authorized(Thread, :read, policy) |> Repo.all()
 
-      forbidden = thread_fixture(%{title: "forbidden"})
+      denied = thread_fixture(%{title: "denied"})
 
-      assert :error = Auth.authorize(forbidden, :read, policy)
-      assert :error = Auth.authorize(forbidden, :edit, policy)
+      assert :error = Auth.authorize(denied, :read, policy)
+      assert :error = Auth.authorize(denied, :edit, policy)
 
       assert [%Thread{id: ^thread_id}] =
                Auth.filter_authorized(Thread, :read, policy) |> Repo.all()

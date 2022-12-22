@@ -7,14 +7,14 @@ defmodule Janus.Policy.Rule do
           schema: Janus.schema_module(),
           action: Janus.action(),
           allow: [keyword() | boolean()],
-          forbid: [keyword() | boolean()]
+          deny: [keyword() | boolean()]
         }
 
   defstruct [
     :schema,
     :action,
     allow: [],
-    forbid: []
+    deny: []
   ]
 
   @valid_options [:where, :where_not, :or_where]
@@ -28,7 +28,7 @@ defmodule Janus.Policy.Rule do
   def allow(rule, opts) do
     opts = parse_opts!(opts)
 
-    if [] in rule.forbid do
+    if [] in rule.deny do
       rule
     else
       Map.update(rule, :allow, [opts], &[opts | &1])
@@ -36,12 +36,12 @@ defmodule Janus.Policy.Rule do
   end
 
   @doc false
-  def forbid(rule, []), do: Map.merge(rule, %{allow: [], forbid: [[]]})
+  def deny(rule, []), do: Map.merge(rule, %{allow: [], deny: [[]]})
 
-  def forbid(rule, opts) do
+  def deny(rule, opts) do
     opts = parse_opts!(opts)
 
-    Map.update(rule, :forbid, [opts], &[opts | &1])
+    Map.update(rule, :deny, [opts], &[opts | &1])
   end
 
   defp parse_opts!(opts) do
@@ -55,7 +55,7 @@ defmodule Janus.Policy.Rule do
   end
 
   defp invalid_opts!(value) do
-    raise ArgumentError, "invalid options passed to `allow` or `forbid`: `#{inspect(value)}`"
+    raise ArgumentError, "invalid options passed to `allow` or `deny`: `#{inspect(value)}`"
   end
 
   defp combine(opts, acc \\ [])

@@ -64,9 +64,9 @@ defmodule Janus.Authorization.Filter do
     }
 
     allowed = with_conditions(base_filter, rule.allow)
-    forbidden = with_conditions(base_filter, rule.forbid)
+    denied = with_conditions(base_filter, rule.deny)
 
-    combine(allowed, :and_not, forbidden)
+    combine(allowed, :and_not, denied)
     |> to_query(Keyword.put(opts, :query, query))
   end
 

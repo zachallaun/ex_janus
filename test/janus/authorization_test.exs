@@ -34,27 +34,27 @@ defmodule Janus.AuthorizationTest do
       refute Auth.any_authorized?(Post, :read, policy)
     end
 
-    test "should return false if a blanket forbid exists" do
+    test "should return false if a blanket deny exists" do
       policy =
         %Janus.Policy{}
         |> allow(:read, Thread)
-        |> forbid(:read, Thread)
+        |> deny(:read, Thread)
 
       refute Auth.any_authorized?(Thread, :read, policy)
 
       policy =
         %Janus.Policy{}
-        |> forbid(:read, Thread)
+        |> deny(:read, Thread)
         |> allow(:read, Thread)
 
       refute Auth.any_authorized?(Thread, :read, policy)
     end
 
-    test "should return true if a forbid is conditional on attribute match" do
+    test "should return true if a deny is conditional on attribute match" do
       policy =
         %Janus.Policy{}
         |> allow(:read, Thread)
-        |> forbid(:read, Thread, where: [archived: true])
+        |> deny(:read, Thread, where: [archived: true])
 
       assert Auth.any_authorized?(Thread, :read, policy)
     end
@@ -68,7 +68,7 @@ defmodule Janus.AuthorizationTest do
   end
 
   describe "blanket permissions" do
-    test "should allow specified actions and forbid all others" do
+    test "should allow specified actions and deny all others" do
       policy =
         %Janus.Policy{}
         |> allow(:read, Thread)
@@ -84,11 +84,11 @@ defmodule Janus.AuthorizationTest do
       assert [%Post{}] = Auth.filter_authorized(Post, :read, policy) |> Repo.all()
     end
 
-    test "should override allow with forbid" do
+    test "should override allow with deny" do
       policy =
         %Janus.Policy{}
         |> allow(:read, Thread)
-        |> forbid(:read, Thread)
+        |> deny(:read, Thread)
 
       thread = thread_fixture()
 
@@ -154,11 +154,11 @@ defmodule Janus.AuthorizationTest do
                Auth.filter_authorized(Thread, :read, policy) |> Repo.all()
     end
 
-    test "should forbid action if an allow is overriden" do
+    test "should deny action if an allow is overriden" do
       policy =
         %Janus.Policy{}
         |> allow(:read, Thread)
-        |> forbid(:read, Thread, where: [archived: true])
+        |> deny(:read, Thread, where: [archived: true])
 
       %{id: thread_id} = thread = thread_fixture()
 
@@ -167,9 +167,9 @@ defmodule Janus.AuthorizationTest do
       assert [%Thread{id: ^thread_id}] =
                Auth.filter_authorized(Thread, :read, policy) |> Repo.all()
 
-      forbidden = thread_fixture(%{archived: true})
+      denied = thread_fixture(%{archived: true})
 
-      assert :error = Auth.authorize(forbidden, :read, policy)
+      assert :error = Auth.authorize(denied, :read, policy)
 
       assert [%Thread{id: ^thread_id}] =
                Auth.filter_authorized(Thread, :read, policy) |> Repo.all()

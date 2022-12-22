@@ -196,7 +196,7 @@ defmodule Janus.Authorization do
     rule = Janus.Policy.rule_for(policy, action, schema)
 
     allow_if_any?(rule.allow, policy, resource)
-    |> forbid_if_any?(rule.forbid, policy, resource)
+    |> deny_if_any?(rule.deny, policy, resource)
     |> case do
       true -> {:ok, resource}
       false -> :error
@@ -207,7 +207,7 @@ defmodule Janus.Authorization do
     allowed? || any_conditions_match?(conditions, policy, resource)
   end
 
-  defp forbid_if_any?(allowed?, conditions, policy, resource) do
+  defp deny_if_any?(allowed?, conditions, policy, resource) do
     allowed? && !any_conditions_match?(conditions, policy, resource)
   end
 

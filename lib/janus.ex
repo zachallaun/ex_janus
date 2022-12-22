@@ -46,7 +46,7 @@ defmodule Janus do
         |> allow(:read, Post)
         |> allow([:edit, :archive, :unarchive], Post, where: [user: [role: :member]])
         |> allow([:edit, :archive, :unarchive], Post, where: [user_id: mod.id])
-        |> forbid(:unarchive, Post, where: [archived_by: [role: :admin]])
+        |> deny(:unarchive, Post, where: [archived_by: [role: :admin]])
       end
 
   See the `Janus.Policy` documentation for more on defining policies.

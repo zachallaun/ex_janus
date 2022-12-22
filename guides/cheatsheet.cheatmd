@@ -228,9 +228,9 @@ policy
 # or define using :where_not
 |> allow(:read, Post, where_not: [archived: true])
 
-# or override a blanket permission using forbid
+# or override a blanket permission using deny
 |> allow(:read, Post)
-|> forbid(:read, Post, where: [archived: true])
+|> deny(:read, Post, where: [archived: true])
 ```
 
 ### Grant permission if the user is associated with the resource
@@ -266,12 +266,12 @@ policy
 |> allow(:read, Post, where: [archived: false]) # has no effect
 ```
 
-### Use `forbid` to override a previous `allow`
+### Use `deny` to override a previous `allow`
 
 ```elixir
 policy
 |> allow(:read, Post)
-|> forbid(:read, Post, where: [archived: true])
+|> deny(:read, Post, where: [archived: true])
 ```
 
 ## Structuring your policy definition
