@@ -1,8 +1,8 @@
 import Config
 
-config :janus, ecto_repos: [JanusTest.Repo]
+config :ex_janus, ecto_repos: [JanusTest.Repo]
 
-config :janus, JanusTest.Repo,
+config :ex_janus, JanusTest.Repo,
   database: "janus_test",
   username: "dev",
   password: "dev",

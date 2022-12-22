@@ -62,7 +62,7 @@ defmodule MixHelper do
 
         File.write!(".formatter.exs", """
         [
-          import_deps: [:ecto, :ecto_sql, :janus],
+          import_deps: [:ecto, :ecto_sql, :ex_janus],
           inputs: ["*.exs"]
         ]
         """)

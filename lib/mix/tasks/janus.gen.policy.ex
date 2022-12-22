@@ -31,7 +31,7 @@ defmodule Mix.Tasks.Janus.Gen.Policy do
 
   defp copy_from(source_dir, binding, mapping) do
     for {source_file, target} <- mapping do
-      source = :janus |> Application.app_dir(source_dir) |> Path.join(source_file)
+      source = :ex_janus |> Application.app_dir(source_dir) |> Path.join(source_file)
       Mix.Generator.create_file(target, EEx.eval_file(source, binding))
     end
   end

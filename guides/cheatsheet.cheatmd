@@ -42,7 +42,7 @@ This is usually the only place you should be referring to `Janus` directly.
 
 ```elixir
 [
-  import_deps: [:janus]
+  import_deps: [:ex_janus]
 ]
 ```
 

@@ -1,12 +1,13 @@
 defmodule Janus.MixProject do
   use Mix.Project
 
+  @app :ex_janus
   @source_url "https://github.com/zachallaun/ex_janus"
   @version "0.1.0-dev"
 
   def project do
     [
-      app: :janus,
+      app: @app,
       version: @version,
       elixir: "~> 1.14",
       elixirc_paths: elixirc_paths(Mix.env()),
