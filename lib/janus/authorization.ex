@@ -95,9 +95,9 @@ defmodule Janus.Authorization do
   ## Options
 
     * `:preload_authorized` - Similar to `Ecto.Query.preload/3`, but only preloads those
-      associated records that are authorized. Note that this requires a database that
-      supports lateral joins. See "Preloading authorized associations" for more
-      information.
+      associated records that are authorized. Note that this requires Ecto v3.9.4 or
+      later and a database that supports lateral joins. See "Preloading authorized
+      associations" for more information.
 
   ## Preloading authorized associations
 
