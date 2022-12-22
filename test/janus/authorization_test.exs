@@ -493,6 +493,26 @@ defmodule Janus.AuthorizationTest do
       assert {:ok, ^post} = Auth.authorize(post, :read, policy)
       assert [_, _] = Auth.filter_authorized(Post, :read, policy) |> Repo.all()
     end
+
+    test "allows/1 in deny/4" do
+      thread = thread_fixture()
+
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Thread, where: [archived: false])
+        |> allow(:edit, Thread, where: [creator_id: thread.creator_id])
+        |> deny(:edit, Thread, where_not: allows(:read))
+
+      assert {:ok, ^thread} = Auth.authorize(thread, :read, policy)
+      assert {:ok, ^thread} = Auth.authorize(thread, :edit, policy)
+      assert [%Thread{}] = Auth.filter_authorized(Thread, :edit, policy) |> Repo.all()
+
+      thread = thread |> Thread.changeset(%{archived: true}) |> Repo.update!()
+
+      assert :error = Auth.authorize(thread, :read, policy)
+      assert :error = Auth.authorize(thread, :edit, policy)
+      assert [] = Auth.filter_authorized(Thread, :edit, policy) |> Repo.all()
+    end
   end
 
   describe "filter_authorized/4" do

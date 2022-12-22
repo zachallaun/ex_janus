@@ -356,13 +356,20 @@ defmodule Janus.Policy do
   If used as the value for an association, the condition will match if the action is
   allowed for the association.
 
-  ## Example
+  ## Examples
 
   Allow users to edit any posts they can delete.
 
       policy
-      |> allow(:delete, Post, where: [user_id: user.id])
       |> allow(:edit, Post, where: allows(:delete))
+      |> allow(:delete, Post, where: [user_id: user.id])
+
+  Don't allow users to edit posts they can't read.
+
+      policy
+      |> allow(:read, Post, where: [archived: false])
+      |> allow(:edit, Post, where: [user_id: user.id])
+      |> deny(:edit, Post, where_not: allows(:read))
 
   ## Example with associations
 
