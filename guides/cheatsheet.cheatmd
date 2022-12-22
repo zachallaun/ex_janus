@@ -94,9 +94,7 @@ end
 ## Defining policies
 {: .col-2}
 
-### Blanket permissions
-
-#### Unconditional access for admin
+### Grant permission for all resources of schema
 
 ```elixir
 def policy_for(policy, %User{role: :admin}) do
@@ -109,7 +107,7 @@ def policy_for(policy, %User{role: :admin}) do
 end
 ```
 
-#### Can also use lists of actions
+### Using lists of actions
 
 ```elixir
 def policy_for(policy, %User{role: :admin}) do
@@ -119,9 +117,7 @@ def policy_for(policy, %User{role: :admin}) do
 end
 ```
 
-### Permissions based on attributes
-
-#### Members can read all unarchived posts
+### Grant permission based on resource attributes
 
 ```elixir
 def policy_for(policy, %User{role: :member} = user) do
@@ -137,18 +133,16 @@ def policy_for(policy, %User{role: :member} = user) do
 end
 ```
 
-### Permissions based on associations
-
-#### Members can edit their own comments
+### Grant permission if the user is associated with the resource
 
 ```elixir
 def policy_for(policy, %User{role: :member} = user) do
   policy
-  |> allow(:edit, Comment, where: [user: [id: user.id]])
+  |> allow(:edit, Comment, where: [user_id: user.id])
 end
 ```
 
-#### Moderators can edit comments made by members
+### Grant permission based on association attributes
 
 ```elixir
 def policy_for(policy, %User{role: :moderator} = user) do
@@ -157,7 +151,7 @@ def policy_for(policy, %User{role: :moderator} = user) do
 end
 ```
 
-#### Members can read comments if they can read the associated post
+### Use `allows` to delegate permission to an association
 
 ```elixir
 def policy_for(policy, %User{role: :member} = user) do
@@ -167,11 +161,7 @@ def policy_for(policy, %User{role: :member} = user) do
 end
 ```
 
-Note: using `Janus.Policy.allows/1` lets you delegate to permissions defined elsewhere without having to duplicate them.
-
-### Multiple rules for the same action/schema
-
-#### Multiple `allow` combines as an "or"
+### Multiple `allow` combines as a logical-or
 
 ```elixir
 # This will always let the user read all posts since
@@ -184,7 +174,7 @@ def policy_for(policy, %User{role: :member} = user) do
 end
 ```
 
-#### Use `forbid` to override a previous `allow`
+### Use `forbid` to override a previous `allow`
 
 ```elixir
 def policy_for(policy, %User{role: :member} = user) do
@@ -194,7 +184,7 @@ def policy_for(policy, %User{role: :member} = user) do
 end
 ```
 
-### Defining actions as strings
+### Define actions using strings
 
 You can use atoms or strings to represent actions. Strings may be useful if allowed actions are stored in an array or map in your database.
 
