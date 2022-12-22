@@ -218,19 +218,45 @@ defmodule Janus.Policy do
 
   ## Example
 
-      before_policy_for __MODULE__
-      before_policy_for {__MODULE__, :check_banned}
+      defmodule Policy do
+        use Janus
 
-      def before_policy_for(:default, policy, actor) do
-        {:cont, policy, preload_required(actor)}
+        before_policy_for __MODULE__
+        before_policy_for {__MODULE__, :check_banned}
+
+        def before_policy_for(:default, policy, user) do
+          {:cont, policy, preload_required(user)}
+        end
+
+        def before_policy_for(:check_banned, policy, user) do
+          if banned?(user) do
+            {:halt, policy}
+          else
+            {:cont, policy, user}
+          end
+        end
+
+        # ...
       end
 
-      def before_policy_for(:check_banned, policy, actor) do
-        if banned?(actor) do
-          {:halt, policy}
-        else
-          {:cont, policy, actor}
+  If desired, hooks can live in another module.
+
+      defmodule Policy.Helpers do
+        def before_policy_for(:check_banned, policy, user) do
+          if User.banned?(user) do
+            {:halt, policy}
+          else
+            {:cont, policy, user}
+          end
         end
+      end
+
+      defmodule Policy do
+        use Janus
+
+        before_policy_for {Policy.Helpers, :check_banned}
+
+        # ...
       end
   """
   defmacro before_policy_for(hook) do
