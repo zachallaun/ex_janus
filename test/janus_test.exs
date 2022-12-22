@@ -613,6 +613,26 @@ defmodule JanusTest do
       assert [%Thread{id: ^thread_id}] =
                Auth.filter_authorized(Thread, :read, policy) |> Repo.all()
     end
+
+    test "should combine multiple option clauses as a logical-and" do
+      [%{id: t1_id} = t1, %{id: t2_id} = t2] = [thread_fixture(), thread_fixture()]
+
+      p1 =
+        %Janus.Policy{}
+        |> allow(:edit, Thread, where: [archived: false], where: [creator_id: t1.creator_id])
+
+      assert {:ok, ^t1} = Auth.authorize(t1, :edit, p1)
+      assert :error = Auth.authorize(t2, :edit, p1)
+      assert [%{id: ^t1_id}] = Auth.filter_authorized(Thread, :edit, p1) |> Repo.all()
+
+      p2 =
+        %Janus.Policy{}
+        |> allow(:edit, Thread, where: [archived: false], where_not: [creator_id: t1.creator_id])
+
+      assert :error = Auth.authorize(t1, :edit, p2)
+      assert {:ok, ^t2} = Auth.authorize(t2, :edit, p2)
+      assert [%{id: ^t2_id}] = Auth.filter_authorized(Thread, :edit, p2) |> Repo.all()
+    end
   end
 
   describe "filter_authorized/4" do
