@@ -9,7 +9,8 @@ defmodule Janus.DataCase do
 
   using do
     quote do
-      alias JanusTest.Repo
+      import JanusTest.Fixtures
+      alias JanusTest.{Forum, Repo}
       alias JanusTest.Schemas.{User, Post, Thread}
     end
   end
