@@ -1,11 +1,44 @@
-# Defining policies
+# Cheatsheet
 
-This cheatsheet references a hypothetical message board with three primary resources: posts, which have many comments, both of which are created by users.
+## Installation and setup
+{: .col-2}
 
-## Example Schemas
-{: .col-3}
+### Dependency
 
-### User
+#### mix.exs
+
+```elixir
+defp deps do
+  [
+    {:ex_janus, github: "zachallaun/ex_janus"}
+  ]
+end
+```
+
+Ecto v3.9.4 or later and a database that supports lateral joins (like PostgreSQL) is required to use all of Janus' features.
+
+### Policy module
+
+#### lib/my_app/policy.ex
+
+```elixir
+defmodule MyApp.Policy do
+  use Janus
+
+  @impl true
+  def policy_for(policy, user) do
+    policy
+    |> # authorization rules
+  end
+end
+```
+
+Your policy module is the authorization interface that the rest of your application will use.
+
+## Schemas referenced in this cheatsheet
+{: .col-2}
+
+### Users
 
 ```elixir
 defmodule User do
@@ -24,7 +57,7 @@ defmodule User do
 end
 ```
 
-### Post
+### Posts
 
 ```elixir
 defmodule Post do
@@ -43,7 +76,7 @@ defmodule Post do
 end
 ```
 
-### Comment
+### Comments
 
 ```elixir
 defmodule Comment do
@@ -58,7 +91,7 @@ defmodule Comment do
 end
 ```
 
-## In the `policy_for/2` callback
+## Defining policies
 {: .col-2}
 
 ### Blanket permissions

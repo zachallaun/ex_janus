@@ -13,7 +13,7 @@ duplication of authorization logic.
 Janus is pre-0.1 and can be installed by adding `ex_janus` as a git dependency in `mix.exs`:
 
 ```elixir
-def deps do
+defp deps do
   [
     {:ex_janus, github: "zachallaun/ex_janus"}
   ]

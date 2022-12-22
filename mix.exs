@@ -89,10 +89,7 @@ defmodule Janus.MixProject do
       extra_section: "GUIDES",
       extras: [
         "README.md",
-        "cheatsheets/defining_policies.cheatmd"
-      ],
-      groups_for_extras: [
-        Cheatsheets: ~r/cheatsheets\/.?/
+        "guides/cheatsheet.cheatmd"
       ]
     ]
   end
