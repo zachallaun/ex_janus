@@ -67,7 +67,7 @@ defmodule Janus.Authorization do
   def any_authorized?(schema_or_query, action, policy) do
     {_query, schema} = Janus.Utils.resolve_query_and_schema!(schema_or_query)
 
-    case Janus.Policy.rule_for(policy, action, schema) do
+    case Policy.rule_for(policy, action, schema) do
       %{allow: []} -> false
       _ -> true
     end
@@ -193,25 +193,23 @@ defmodule Janus.Authorization do
   @spec authorize(Ecto.Schema.t(), Janus.action(), Policy.t(), keyword()) ::
           {:ok, Ecto.Schema.t()} | :error
   def authorize(%schema{} = resource, action, policy, _opts \\ []) do
-    rule = Janus.Policy.rule_for(policy, action, schema)
+    rule = Policy.rule_for(policy, action, schema)
 
-    {:ok, resource}
-    |> run_conditions(rule.allow, policy, :ok_if_any)
-    |> run_conditions(rule.deny, policy, :error_if_any)
+    with {:match, resource} <- run_rule(rule, :allow, resource, policy),
+         {:no_match, resource} <- run_rule(rule, :deny, resource, policy) do
+      {:ok, resource}
+    else
+      _ -> :error
+    end
   end
 
-  defp run_conditions({:ok, resource}, conditions, policy, :ok_if_any) do
-    if any_conditions_match?(resource, conditions, policy), do: {:ok, resource}, else: :error
-  end
+  defp run_rule(%Policy.Rule{} = rule, attr, resource, policy) do
+    conditions = Map.fetch!(rule, attr)
 
-  defp run_conditions({:ok, resource}, conditions, policy, :error_if_any) do
-    if any_conditions_match?(resource, conditions, policy), do: :error, else: {:ok, resource}
-  end
-
-  defp run_conditions(:error, _conditions, _policy, _), do: :error
-
-  defp any_conditions_match?(resource, conditions, policy) do
-    Enum.any?(conditions, &condition_match?(&1, policy, resource))
+    case Enum.any?(conditions, &condition_match?(&1, policy, resource)) do
+      true -> {:match, resource}
+      false -> {:no_match, resource}
+    end
   end
 
   defp condition_match?([], _policy, _resource), do: true
@@ -236,10 +234,12 @@ defmodule Janus.Authorization do
     Enum.all?(list, &clause_match?(&1, policy, resource))
   end
 
-  defp clause_match?({:__derived_allow__, action}, policy, resource) do
-    case authorize(resource, action, policy) do
-      {:ok, _} -> true
-      :error -> false
+  defp clause_match?({:__derived__, attr, action}, policy, %schema{} = resource) do
+    rule = Policy.rule_for(policy, action, schema)
+
+    case run_rule(rule, attr, resource, policy) do
+      {:match, _} -> true
+      {:no_match, _} -> false
     end
   end
 

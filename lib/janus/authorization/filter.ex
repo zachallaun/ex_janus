@@ -138,7 +138,7 @@ defmodule Janus.Authorization.Filter do
     end
   end
 
-  defp apply_clause({:__derived_allow__, action}, filter) do
+  defp apply_clause({:__derived__, :allow, action}, filter) do
     subquery = filter(filter.schema, action, filter.policy)
     %{filter | joins: merge_joins(filter.joins, __subquery__: {subquery, filter.binding})}
   end

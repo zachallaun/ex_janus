@@ -380,7 +380,7 @@ defmodule Janus.Policy do
       |> allow(:read, Post, where: [archived: false], where_not: [published_at: nil])
       |> allow(:read, Comment, where: [post: allows(:read)])
   """
-  def allows(action), do: {:__derived_allow__, action}
+  def allows(action), do: {:__derived__, :allow, action}
 
   @doc false
   @spec rule_for(t, Janus.action(), Janus.schema_module()) :: Rule.t()
