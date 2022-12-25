@@ -18,10 +18,6 @@ defmodule Janus.Authorization.Filter do
 
   defstruct [:policy, :action, :schema, :binding, :parent_binding, :dynamic, joins: []]
 
-  defimpl Ecto.Queryable do
-    def to_query(filter), do: Filter.to_query(filter)
-  end
-
   @doc """
   Converts a `%Filter{}` struct into an `%Ecto.Query{}`
 
