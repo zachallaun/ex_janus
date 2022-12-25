@@ -41,8 +41,7 @@ defmodule Mix.Tasks.Janus.Gen.Policy do
 
     opts
     |> Keyword.put_new_lazy(:module, &default_module/0)
-    |> Keyword.update!(:module, &parse_module!/1)
-    |> Keyword.update!(:module, &module_to_string!/1)
+    |> Keyword.update!(:module, &module_for_template!/1)
     |> Keyword.put_new_lazy(:path, &default_path/0)
     |> Keyword.put_new_lazy(:app_namespace, &app_namespace/0)
   end
@@ -55,34 +54,48 @@ defmodule Mix.Tasks.Janus.Gen.Policy do
     Module.concat(app_namespace(), Policy)
   end
 
-  defp module_to_string!(module) when is_atom(module) do
-    case to_string(module) do
-      "Elixir." <> module -> module
-      module -> module
-    end
+  defp module_for_template!(module) do
+    module
+    |> parse_module!()
+    |> display_name()
   end
 
-  defp parse_module!(module) when is_atom(module) do
-    ensure_unused!(module)
+  defp display_name(module) do
+    "Elixir." <> name = to_string(module)
+    name
   end
 
   defp parse_module!(module) when is_binary(module) do
     module
     |> String.split(".")
     |> Module.concat()
+    |> parse_module!()
+  end
+
+  defp parse_module!(module) when is_atom(module) do
+    module
+    |> ensure_alias!()
     |> ensure_unused!()
   end
 
   defp ensure_unused!(module) do
-    name = Module.concat(Elixir, module)
-
-    if Code.ensure_loaded?(name) do
+    if Code.ensure_loaded?(module) do
       Mix.raise(
-        "Module name #{inspect(module)} is already taken. Please specify another using --module."
+        "Module name `#{inspect(module)}` is already taken. Please specify another using --module."
       )
-    else
-      module
     end
+
+    module
+  end
+
+  defp ensure_alias!(module) do
+    unless Macro.classify_atom(module) == :alias do
+      Mix.raise(
+        "Module name `#{display_name(module)}` is invalid. Expected an alias, e.g. `MyApp.Policy`"
+      )
+    end
+
+    module
   end
 
   defp app_namespace do

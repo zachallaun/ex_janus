@@ -12,8 +12,16 @@ defmodule Mix.Tasks.Janus.Gen.PolicyTest do
 
   test "invalid arguments", config do
     in_tmp_project(config.test, fn ->
-      assert_raise Mix.Error, ~r/Module name Janus.Policy is already taken/, fn ->
+      assert_raise Mix.Error, ~r/Module name `Janus.Policy` is already taken/, fn ->
         Gen.Policy.run(~w(--module Janus.Policy))
+      end
+    end)
+
+    in_tmp_project(config.test, fn ->
+      message = "Module name `policy` is invalid. Expected an alias, e.g. `MyApp.Policy`"
+
+      assert_raise Mix.Error, message, fn ->
+        Gen.Policy.run(~w(--module policy))
       end
     end)
   end
