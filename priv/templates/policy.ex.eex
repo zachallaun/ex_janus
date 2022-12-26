@@ -14,7 +14,8 @@ defmodule <%= module %> do
   @doc """
   Load and authorize a resource.
 
-  Returns `{:ok, resource}` if the actor is authorized, otherwise `:error`.
+  Returns `{:ok, resource}` if the actor is authorized, otherwise
+  `{:error, :not_authorized}`.
 
   ## Examples
 
@@ -22,7 +23,7 @@ defmodule <%= module %> do
       {:ok, %MyResource{...}}
 
       iex> load_and_authorize(Restricted, :read, user, id: resource_id)
-      :error
+      {:error, :not_authorized}
 
       iex> load_and_authorize(MyResource, :read, user, other_unique_key: key)
       {:ok, %MyResource{...}}
@@ -38,7 +39,7 @@ defmodule <%= module %> do
   Loads authorized resources.
 
   Returns `{:ok, resources}` if the actor has access to any resources from `schema`,
-  otherwise `:error`.
+  otherwise `{:error, :not_authorized}`.
 
   Note that `{:ok, []}` only means that the query returned no results, not that the actor
   was unauthorized.
@@ -49,7 +50,7 @@ defmodule <%= module %> do
       {:ok, [%MyResource{...}, ...]}
 
       iex> load_authorized(Restricted, :read, user)
-      :error
+      {:error, :not_authorized}
 
       iex> MyResource
       ...> order_by(desc: :inserted_at)
@@ -62,7 +63,7 @@ defmodule <%= module %> do
     if any_authorized?(query_or_schema, action, policy) do
       {:ok, scope(query_or_schema, action, policy, opts) |> Repo.all()}
     else
-      :error
+      {:error, :not_authorized}
     end
   end
 end

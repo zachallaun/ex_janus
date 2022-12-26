@@ -31,7 +31,7 @@ defmodule Janus.PolicyTest do
         |> allow(:read, Thread, where: [archived: false], or_where: [id: t1_id])
 
       assert {:ok, ^t1} = Auth.authorize(t1, :read, p1)
-      assert :error = Auth.authorize(t2, :read, p1)
+      assert {:error, :not_authorized} = Auth.authorize(t2, :read, p1)
       assert [%Thread{id: ^t1_id}] = Auth.scope(Thread, :read, p1) |> Repo.all()
 
       # archived or not t2
@@ -41,7 +41,7 @@ defmodule Janus.PolicyTest do
         |> deny(:read, Thread, where: [archived: false], or_where: [id: t2_id])
 
       assert {:ok, ^t1} = Auth.authorize(t1, :read, p2)
-      assert :error = Auth.authorize(t2, :read, p2)
+      assert {:error, :not_authorized} = Auth.authorize(t2, :read, p2)
       assert [%Thread{id: ^t1_id}] = Auth.scope(Thread, :read, p2) |> Repo.all()
 
       # not archived or t1
@@ -50,7 +50,7 @@ defmodule Janus.PolicyTest do
         |> allow(:read, Thread, where_not: [archived: true], or_where: [id: t1_id])
 
       assert {:ok, ^t1} = Auth.authorize(t1, :read, p3)
-      assert :error = Auth.authorize(t2, :read, p3)
+      assert {:error, :not_authorized} = Auth.authorize(t2, :read, p3)
       assert [%Thread{id: ^t1_id}] = Auth.scope(Thread, :read, p3) |> Repo.all()
 
       # (not archived or t1) and not t1
@@ -62,8 +62,8 @@ defmodule Janus.PolicyTest do
           where_not: [id: t1_id]
         )
 
-      assert :error = Auth.authorize(t1, :read, p4)
-      assert :error = Auth.authorize(t2, :read, p4)
+      assert {:error, :not_authorized} = Auth.authorize(t1, :read, p4)
+      assert {:error, :not_authorized} = Auth.authorize(t2, :read, p4)
       assert [] = Auth.scope(Thread, :read, p4) |> Repo.all()
 
       # (not archived or t1) or t2
@@ -89,7 +89,7 @@ defmodule Janus.PolicyTest do
         )
 
       assert {:ok, ^t1} = Auth.authorize(t1, :read, p6)
-      assert :error = Auth.authorize(t2, :read, p6)
+      assert {:error, :not_authorized} = Auth.authorize(t2, :read, p6)
       assert [%Thread{id: ^t1_id}] = Auth.scope(Thread, :read, p6) |> Repo.all()
     end
 
@@ -108,8 +108,8 @@ defmodule Janus.PolicyTest do
 
       denied = thread_fixture(%{title: "denied"})
 
-      assert :error = Auth.authorize(denied, :read, policy)
-      assert :error = Auth.authorize(denied, :edit, policy)
+      assert {:error, :not_authorized} = Auth.authorize(denied, :read, policy)
+      assert {:error, :not_authorized} = Auth.authorize(denied, :edit, policy)
 
       assert [%Thread{id: ^thread_id}] = Auth.scope(Thread, :read, policy) |> Repo.all()
     end
@@ -122,14 +122,14 @@ defmodule Janus.PolicyTest do
         |> allow(:edit, Thread, where: [archived: false], where: [creator_id: t1.creator_id])
 
       assert {:ok, ^t1} = Auth.authorize(t1, :edit, p1)
-      assert :error = Auth.authorize(t2, :edit, p1)
+      assert {:error, :not_authorized} = Auth.authorize(t2, :edit, p1)
       assert [%{id: ^t1_id}] = Auth.scope(Thread, :edit, p1) |> Repo.all()
 
       p2 =
         %Janus.Policy{}
         |> allow(:edit, Thread, where: [archived: false], where_not: [creator_id: t1.creator_id])
 
-      assert :error = Auth.authorize(t1, :edit, p2)
+      assert {:error, :not_authorized} = Auth.authorize(t1, :edit, p2)
       assert {:ok, ^t2} = Auth.authorize(t2, :edit, p2)
       assert [%{id: ^t2_id}] = Auth.scope(Thread, :edit, p2) |> Repo.all()
     end

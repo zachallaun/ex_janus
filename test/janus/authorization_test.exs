@@ -79,8 +79,8 @@ defmodule Janus.AuthorizationTest do
 
       assert {:ok, ^thread} = Auth.authorize(thread, :read, policy)
       assert {:ok, ^post} = Auth.authorize(post, :read, policy)
-      assert :error = Auth.authorize(thread, :other, policy)
-      assert :error = Auth.authorize(thread.creator, :read, policy)
+      assert {:error, :not_authorized} = Auth.authorize(thread, :other, policy)
+      assert {:error, :not_authorized} = Auth.authorize(thread.creator, :read, policy)
       assert [%Post{}] = Auth.scope(Post, :read, policy) |> Repo.all()
     end
 
@@ -92,7 +92,7 @@ defmodule Janus.AuthorizationTest do
 
       thread = thread_fixture()
 
-      assert :error = Auth.authorize(thread, :ready, policy)
+      assert {:error, :not_authorized} = Auth.authorize(thread, :ready, policy)
       assert [] = Auth.scope(Post, :read, policy) |> Repo.all()
     end
   end
@@ -107,7 +107,7 @@ defmodule Janus.AuthorizationTest do
       archived = thread_fixture() |> Thread.changeset(%{archived: true}) |> Repo.update!()
 
       assert {:ok, ^unarchived} = Auth.authorize(unarchived, :read, policy)
-      assert :error = Auth.authorize(archived, :read, policy)
+      assert {:error, :not_authorized} = Auth.authorize(archived, :read, policy)
       assert [%Thread{} = thread] = Auth.scope(Thread, :read, policy) |> Repo.all()
       assert thread.id == unarchived.id
     end
@@ -135,7 +135,7 @@ defmodule Janus.AuthorizationTest do
       thread = thread_fixture(%{creator_id: user1.id})
 
       assert {:ok, ^thread} = Auth.authorize(thread, :edit, policy1)
-      assert :error = Auth.authorize(thread, :edit, policy2)
+      assert {:error, :not_authorized} = Auth.authorize(thread, :edit, policy2)
       assert [%Thread{}] = Auth.scope(Thread, :edit, policy1) |> Repo.all()
       assert [] = Auth.scope(Thread, :edit, policy2) |> Repo.all()
     end
@@ -148,7 +148,7 @@ defmodule Janus.AuthorizationTest do
         |> allow(:read, Thread, where: [archived: false], where_not: [id: unreadable.id])
 
       assert {:ok, ^readable} = Auth.authorize(readable, :read, policy)
-      assert :error = Auth.authorize(unreadable, :read, policy)
+      assert {:error, :not_authorized} = Auth.authorize(unreadable, :read, policy)
 
       assert [%Thread{id: ^readable_id}] = Auth.scope(Thread, :read, policy) |> Repo.all()
     end
@@ -167,7 +167,7 @@ defmodule Janus.AuthorizationTest do
 
       denied = thread_fixture(%{archived: true})
 
-      assert :error = Auth.authorize(denied, :read, policy)
+      assert {:error, :not_authorized} = Auth.authorize(denied, :read, policy)
 
       assert [%Thread{id: ^thread_id}] = Auth.scope(Thread, :read, policy) |> Repo.all()
     end
@@ -181,7 +181,7 @@ defmodule Janus.AuthorizationTest do
       {:ok, u2} = u2 |> User.changeset(%{status: :banned}) |> Repo.update()
 
       assert {:ok, ^u1} = Auth.authorize(u1, :read, policy)
-      assert :error = Auth.authorize(u2, :read, policy)
+      assert {:error, :not_authorized} = Auth.authorize(u2, :read, policy)
       assert [%User{id: ^u1_id}] = Auth.scope(User, :read, policy) |> Repo.all()
     end
 
@@ -194,7 +194,7 @@ defmodule Janus.AuthorizationTest do
       not_allowed = thread_fixture(%{category: "anything"})
 
       assert {:ok, ^allowed} = Auth.authorize(allowed, :read, policy)
-      assert :error = Auth.authorize(not_allowed, :read, policy)
+      assert {:error, :not_authorized} = Auth.authorize(not_allowed, :read, policy)
 
       assert [%Thread{id: ^allowed_id}] = Auth.scope(Thread, :read, policy) |> Repo.all()
     end
@@ -232,7 +232,7 @@ defmodule Janus.AuthorizationTest do
       {:ok, t2} = t2 |> Thread.changeset(%{archived: true}) |> Repo.update()
 
       assert {:ok, ^t1} = Auth.authorize(t1, :read, policy)
-      assert :error = Auth.authorize(t2, :read, policy)
+      assert {:error, :not_authorized} = Auth.authorize(t2, :read, policy)
       assert [%Thread{id: ^t1_id}] = Auth.scope(Thread, :read, policy) |> Repo.all()
     end
 
@@ -260,7 +260,7 @@ defmodule Janus.AuthorizationTest do
       p2 = Repo.preload(p2, :thread)
 
       assert {:ok, ^p1} = Auth.authorize(p1, :read, policy)
-      assert :error = Auth.authorize(p2, :read, policy)
+      assert {:error, :not_authorized} = Auth.authorize(p2, :read, policy)
       assert [%Post{id: ^p1_id}] = Auth.scope(Post, :read, policy) |> Repo.all()
     end
 
@@ -297,7 +297,7 @@ defmodule Janus.AuthorizationTest do
       _ = post.thread |> Thread.changeset(%{archived: true}) |> Repo.update!()
       post = Repo.preload(post, :thread, force: true)
 
-      assert :error = Auth.authorize(post, :read, policy)
+      assert {:error, :not_authorized} = Auth.authorize(post, :read, policy)
       assert [] = Auth.scope(Post, :read, policy) |> Repo.all()
     end
 
@@ -337,7 +337,7 @@ defmodule Janus.AuthorizationTest do
           where_not: [creator: [id: t1.creator_id]]
         )
 
-      assert :error = Auth.authorize(t1, :read, p1)
+      assert {:error, :not_authorized} = Auth.authorize(t1, :read, p1)
       assert {:ok, ^t2} = Auth.authorize(t2, :read, p1)
       assert [%Thread{id: ^t2_id}] = Auth.scope(Thread, :read, p1) |> Repo.all()
 
@@ -349,8 +349,8 @@ defmodule Janus.AuthorizationTest do
           where_not: [creator: [id: t2.creator_id]]
         )
 
-      assert :error = Auth.authorize(t1, :read, p2)
-      assert :error = Auth.authorize(t2, :read, p2)
+      assert {:error, :not_authorized} = Auth.authorize(t1, :read, p2)
+      assert {:error, :not_authorized} = Auth.authorize(t2, :read, p2)
       assert [] = Auth.scope(Thread, :read, p2) |> Repo.all()
     end
   end
@@ -470,8 +470,8 @@ defmodule Janus.AuthorizationTest do
 
       thread = thread |> Thread.changeset(%{archived: true}) |> Repo.update!()
 
-      assert :error = Auth.authorize(thread, :read, policy)
-      assert :error = Auth.authorize(thread, :edit, policy)
+      assert {:error, :not_authorized} = Auth.authorize(thread, :read, policy)
+      assert {:error, :not_authorized} = Auth.authorize(thread, :edit, policy)
       assert [] = Auth.scope(Thread, :edit, policy) |> Repo.all()
     end
 
@@ -502,8 +502,8 @@ defmodule Janus.AuthorizationTest do
 
       thread = thread |> Thread.changeset(%{archived: true}) |> Repo.update!()
 
-      assert :error = Auth.authorize(thread, :read, policy)
-      assert :error = Auth.authorize(thread, :edit, policy)
+      assert {:error, :not_authorized} = Auth.authorize(thread, :read, policy)
+      assert {:error, :not_authorized} = Auth.authorize(thread, :edit, policy)
       assert [] = Auth.scope(Thread, :edit, policy) |> Repo.all()
     end
   end

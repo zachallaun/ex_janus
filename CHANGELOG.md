@@ -6,7 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- All instances of `filter_authorized` replaced by `scope` (no changes to functionality).
+- (Breaking) All instances of `filter_authorized` replaced by `scope` (no changes to functionality).
+- (Breaking) When failing to authorize, return `{:error, :not_authorized}` instead of `:error`.
 
 ## v0.1.0 (2022-12-25)
 

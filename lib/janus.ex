@@ -66,7 +66,7 @@ defmodule Janus do
       {:ok, some_post}
 
       iex> Policy.authorize(post_archived_by_admin, :unarchive, moderator)
-      :error
+      {:error, :not_authorized}
 
       iex> Policy.scope(Post, :read, moderator)
       %Ecto.Query{}

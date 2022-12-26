@@ -334,7 +334,7 @@ def update_post(%Post{} = post, attrs \\ %{}, user_or_policy) do
       |> Post.changeset(attrs)
       |> Repo.insert()
 
-    :error ->
+    {:error, :not_authorized} ->
       {:error, :not_authorized}
   end
 end

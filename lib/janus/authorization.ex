@@ -23,7 +23,7 @@ defmodule Janus.Authorization do
   @type filterable :: Janus.schema_module() | Ecto.Query.t()
 
   @callback authorize(Ecto.Schema.t(), Janus.action(), Janus.actor() | Policy.t(), keyword()) ::
-              {:ok, Ecto.Schema.t()} | :error
+              {:ok, Ecto.Schema.t()} | {:error, :not_authorized}
 
   @callback any_authorized?(filterable, Janus.action(), Janus.actor() | Policy.t()) ::
               boolean()
@@ -48,12 +48,12 @@ defmodule Janus.Authorization do
       if any_authorized?(query, :read, user) do
         {:ok, scope(query, :read, user) |> Repo.all()}
       else
-        :error
+        {:error, :not_authorized}
       end
 
   This would result in `{:ok, results}` if the user is authorized to read any resources,
-  even if the result set is empty, and would result in `:error` if the user isn't
-  authorized to read the resources at all.
+  even if the result set is empty, and would result in `{:error, :not_authorized}` if the
+  user isn't authorized to read the resources at all.
 
   ## Examples
 
@@ -177,7 +177,7 @@ defmodule Janus.Authorization do
 
   Expects to receive a struct, an action, and an actor or policy.
 
-  Returns `{:ok, resource}` if authorized, otherwise `:error`.
+  Returns `{:ok, resource}` if authorized, otherwise `{:error, :not_authorized}`.
 
   ## Examples
 
@@ -188,10 +188,10 @@ defmodule Janus.Authorization do
       {:ok, %MyResource{}}
 
       iex> MyPolicy.authorize(%MyResource{}, :delete, actor)
-      :error
+      {:error, :not_authorized}
   """
   @spec authorize(Ecto.Schema.t(), Janus.action(), Policy.t(), keyword()) ::
-          {:ok, Ecto.Schema.t()} | :error
+          {:ok, Ecto.Schema.t()} | {:error, :not_authorized}
   def authorize(%schema{} = resource, action, policy, _opts \\ []) do
     rule = Policy.rule_for(policy, action, schema)
 
@@ -199,7 +199,7 @@ defmodule Janus.Authorization do
          {:no_match, resource} <- run_rule(rule, :deny, resource, policy) do
       {:ok, resource}
     else
-      _ -> :error
+      _ -> {:error, :not_authorized}
     end
   end
 
