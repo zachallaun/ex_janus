@@ -295,6 +295,12 @@ defmodule Janus.Authorization do
     * `:post_message` - the message in case the authorization check fails on the resource
       after applying changes, defaults to "is not authorized to make these changes"
 
+  ## Examples
+
+      iex> %MyResource{}
+      ...> |> MyResource.changeset(attrs)
+      ...> |> MyPolicy.validate_authorized(:update, current_user)
+      %Ecto.Changeset{}
   """
   @spec authorize(Ecto.Changeset.t(Ecto.Schema.t()), Janus.action(), Policy.t(), keyword()) ::
           Ecto.Changeset.t(Ecto.Schema.t())
