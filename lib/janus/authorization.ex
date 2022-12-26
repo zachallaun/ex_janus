@@ -6,7 +6,7 @@ defmodule Janus.Authorization do
   throughout the rest of your application.
 
     * `authorize/4` - authorize an individual, already-loaded resource
-    * `filter_authorized/4` - construct an `Ecto` query for a schema that will filter
+    * `scope/4` - construct an `Ecto` query for a schema that will filter
       results to only those that are authorized
     * `any_authorized?/3` - checks whether the given actor/policy has _any_ access to
       the given schema for the given action
@@ -28,13 +28,13 @@ defmodule Janus.Authorization do
   @callback any_authorized?(filterable, Janus.action(), Janus.actor() | Policy.t()) ::
               boolean()
 
-  @callback filter_authorized(filterable, Janus.action(), Janus.actor() | Policy.t(), keyword()) ::
+  @callback scope(filterable, Janus.action(), Janus.actor() | Policy.t(), keyword()) ::
               Ecto.Query.t()
 
   @doc """
   Checks whether any permissions are defined for the given schema, action, and actor.
 
-  This function is most useful in conjunction with `c:filter_authorized/4`, which builds
+  This function is most useful in conjunction with `scope/4`, which builds
   an `Ecto` query that filters to only those resources the actor is authorized for. If
   you run the resulting query and receive `[]`, it is not possible to determine whether
   the result is empty because the actor wasn't authorized for _any_ resources or because
@@ -46,7 +46,7 @@ defmodule Janus.Authorization do
       query = from(r in MyResource, where: r.inserted_at > from_now(-1, "day"))
 
       if any_authorized?(query, :read, user) do
-        {:ok, filter_authorized(query, :read, user) |> Repo.all()}
+        {:ok, scope(query, :read, user) |> Repo.all()}
       else
         :error
       end
@@ -80,17 +80,17 @@ defmodule Janus.Authorization do
   query, in which case it will compose with that query. If a query is passed, the
   appropriate schema will be derived from that query's source.
 
-      filter_authorized(MyResource, :read, user)
+      scope(MyResource, :read, user)
 
       query = from(r in MyResource, where: r.inserted_at > from_ago(1, "day"))
-      filter_authorized(query, :read, user)
+      scope(query, :read, user)
 
   If the query specifies the source as a string, we cannot derive the schema. For
   example, this will not work:
 
       # Raises an ArgumentError
       query = from(r in "my_resources", where: r.inserted_at > from_ago(1, "day"))
-      filter_authorized(query, :read, user)
+      scope(query, :read, user)
 
   ## Options
 
@@ -114,7 +114,7 @@ defmodule Janus.Authorization do
 
       iex> User
       ...> |> search(search_params)
-      ...> |> MyPolicy.filter_authorized(:read, current_user,
+      ...> |> MyPolicy.scope(:read, current_user,
       ...>   preload_authorized: [comments: last_comment]
       ...> )
       ...> |> Repo.all()
@@ -131,14 +131,14 @@ defmodule Janus.Authorization do
   It is also possible to nest authorized preloads. For instance, you could preload
   comments and their associated post.
 
-      MyPolicy.filter_authorized(User, :read, current_user,
+      MyPolicy.scope(User, :read, current_user,
         preload_authorized: [comments: :post]
       )
 
   This would load all comments. You could incorporate the `last_comment` query above by
   specifying it as the first element of a tuple, followed by the list of inner preloads:
 
-      MyPolicy.filter_authorized(User, :read, current_user,
+      MyPolicy.scope(User, :read, current_user,
         preload_authorized: [comments: {last_comment, [:post]}]
       )
 
@@ -147,28 +147,28 @@ defmodule Janus.Authorization do
 
   ## Examples
 
-      iex> MyPolicy.filter_authorized(MyResource, :read, actor)
+      iex> MyPolicy.scope(MyResource, :read, actor)
       %Ecto.Query{}
 
-      iex> MyPolicy.filter_authorized(MyResource, :read, actor) |> Repo.all()
+      iex> MyPolicy.scope(MyResource, :read, actor) |> Repo.all()
       [%MyResource{}, ...]
 
       iex> MyResource
-      ...> |> MyPolicy.filter_authorized(:read, actor)
+      ...> |> MyPolicy.scope(:read, actor)
       ...> |> order_by(inserted_at: :desc)
       ...> |> limit(1)
       ...> |> Repo.one()
       %MyResource{}
 
       iex> MyResource
-      ...> |> MyPolicy.filter_authorized(:read, actor,
+      ...> |> MyPolicy.scope(:read, actor,
       ...>   preload_authorized: :other
       ...> )
       ...> |> Repo.all()
       [%MyResource{other: %OtherResource{}}, ...]
   """
-  @spec filter_authorized(filterable, Janus.action(), Policy.t(), keyword()) :: Ecto.Query.t()
-  def filter_authorized(query_or_schema, action, policy, opts \\ []) do
+  @spec scope(filterable, Janus.action(), Policy.t(), keyword()) :: Ecto.Query.t()
+  def scope(query_or_schema, action, policy, opts \\ []) do
     Janus.Authorization.Filter.filter(query_or_schema, action, policy, opts)
   end
 

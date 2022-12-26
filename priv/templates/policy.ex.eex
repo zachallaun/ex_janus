@@ -60,7 +60,7 @@ defmodule <%= module %> do
     policy = policy_for(actor)
 
     if any_authorized?(query_or_schema, action, policy) do
-      {:ok, filter_authorized(query_or_schema, action, policy, opts) |> Repo.all()}
+      {:ok, scope(query_or_schema, action, policy, opts) |> Repo.all()}
     else
       :error
     end

@@ -23,21 +23,21 @@ defmodule JanusTest do
       assert ExamplePolicy.any_authorized?(Thread, :read, :user)
     end
 
-    test "defines authorized/3 accepting a first-argument schema" do
+    test "defines scope/3 accepting a first-argument schema" do
       _ = [thread_fixture(), thread_fixture(), thread_fixture()]
-      query = ExamplePolicy.filter_authorized(Thread, :read, :user)
+      query = ExamplePolicy.scope(Thread, :read, :user)
 
       assert %Ecto.Query{} = query
       assert [_, _, _] = Repo.all(query)
     end
 
-    test "defines authorized/3 accepting a first-argument query" do
+    test "defines scope/3 accepting a first-argument query" do
       _ = [thread_fixture(), thread_fixture(), thread_fixture()]
 
       query =
         Thread
         |> limit(1)
-        |> ExamplePolicy.filter_authorized(:read, :user)
+        |> ExamplePolicy.scope(:read, :user)
 
       assert [_] = Repo.all(query)
     end

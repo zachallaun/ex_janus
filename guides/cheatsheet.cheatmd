@@ -122,15 +122,15 @@ policy
 #### When generating a query
 
 ```elixir
-MyApp.Policy.filter_authorized(Post, :edit, current_user)
-#                        ^^^^
+MyApp.Policy.scope(Post, :edit, current_user)
+#                  ^^^^
 ```
 
 #### When checking whether any auth rules are defined
 
 ```elixir
 MyApp.Policy.any_authorized?(Post, :edit, current_user)
-#                      ^^^^
+#                            ^^^^
 ```
 
 ### Resources
@@ -141,7 +141,7 @@ Resources are loaded structs defined by one of your schemas.
 
 ```elixir
 MyApp.Policy.authorize(%Post{}, :edit, current_user)
-#                ^^^^^^^
+#                      ^^^^^^^
 ```
 
 ### Actors
@@ -163,7 +163,7 @@ end
 
 ```elixir
 MyApp.Policy.authorize(%Post{}, :edit, current_user)
-#                                ^^^^^^^^^^^^
+#                                      ^^^^^^^^^^^^
 ```
 
 ### Actions
@@ -183,7 +183,7 @@ policy
 
 ```elixir
 MyApp.Policy.authorize(%Post{}, :edit, current_user)
-#                         ^^^^^
+#                               ^^^^^
 ```
 
 #### Can be any term (except a list)
@@ -315,7 +315,7 @@ defmodule MyApp.MessageBoard do
   """
   import Ecto.Query
 
-  # imports authorize, any_authorized?, filter_authorized, etc.
+  # imports authorize, any_authorized?, scope, etc.
   import MyApp.Policy
 
   alias MyApp.Repo
@@ -347,7 +347,7 @@ def authorized_posts(user_or_policy) do
   if any_authorized?(Post, :read, user_or_policy) do
     posts =
       Post
-      |> filter_authorized(:read, user_or_policy)
+      |> scope(:read, user_or_policy)
       |> Repo.all()
 
     {:ok, posts}
@@ -362,13 +362,13 @@ Use `any_authorized?/3` to differentiate between a result that is empty because 
 ### Preloading authorized associations
 
 ```elixir
-filter_authorized(Post, :read, user_or_policy,
+scope(Post, :read, user_or_policy,
   preload_authorized: :comments
 )
 ```
 
 ```elixir
-filter_authorized(Post, :read, user_or_policy,
+scope(Post, :read, user_or_policy,
   preload_authorized: [comments: :user]
 )
 ```
@@ -383,7 +383,7 @@ latest_comment_query =
     order_by: [desc: :inserted_at],
     limit: 1
 
-filter_authorized(Post, :read, user_or_policy,
+scope(Post, :read, user_or_policy,
   preload_authorized: [comments: latest_comment_query]
 )
 ```
@@ -395,7 +395,7 @@ The above would return all `:read`-able posts preloaded with their latest `:read
 You can still include nested preloads using a tuple:
 
 ```elixir
-filter_authorized(Post, :read, user_or_policy,
+scope(Post, :read, user_or_policy,
   preload_authorized: [comments: {latest_comment_query, [:user]}]
 )
 ```
@@ -416,7 +416,7 @@ iex> policy = MyApp.Policy.policy_for(current_user)
 iex> MyApp.Policy.authorize(post, :read, policy)
 {:ok, post}
 
-iex> MyApp.Policy.filter_authorized(Post, :read, policy)
+iex> MyApp.Policy.scope(Post, :read, policy)
 %Ecto.Query{}
 ```
 

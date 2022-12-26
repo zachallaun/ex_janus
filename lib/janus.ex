@@ -61,10 +61,10 @@ defmodule Janus do
       iex> Policy.authorize(post_archived_by_admin, :unarchive, moderator)
       :error
 
-      iex> Policy.filter_authorized(Post, :read, moderator)
+      iex> Policy.scope(Post, :read, moderator)
       %Ecto.Query{}
 
-      iex> Policy.filter_authorized(Post, :read, moderator) |> Repo.all()
+      iex> Policy.scope(Post, :read, moderator) |> Repo.all()
       [ ... posts the moderator can read ]
 
       iex> Policy.any_authorized?(Post, :edit, moderator)
@@ -92,7 +92,7 @@ defmodule Janus do
       # user).
 
       Post
-      |> Policy.filter_authorized(:read, current_user,
+      |> Policy.scope(:read, current_user,
         preload_authorized: :user
       )
       |> order_by(desc: :inserted_at)
@@ -128,7 +128,7 @@ defmodule Janus do
         end
       end
 
-      # imports `authorize`, `filter_authorized`, and `any_authorized?`
+      # imports `authorize`, `scope`, and `any_authorized?`
       use MyApp.Policy
   """
   defmacro __using__(_opts) do
@@ -149,8 +149,8 @@ defmodule Janus do
       end
 
       @impl Janus.Authorization
-      def filter_authorized(query_or_schema, action, actor, opts \\ []) do
-        Janus.Authorization.filter_authorized(query_or_schema, action, policy_for(actor), opts)
+      def scope(query_or_schema, action, actor, opts \\ []) do
+        Janus.Authorization.scope(query_or_schema, action, policy_for(actor), opts)
       end
     end
   end

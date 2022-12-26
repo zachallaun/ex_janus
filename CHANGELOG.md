@@ -2,9 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## v0.2.0-dev
 
-- ...
+### Changed
+
+- All instances of `filter_authorized` replaced by `scope` (no changes to functionality).
 
 ## v0.1.0 (2022-12-25)
 

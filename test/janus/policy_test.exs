@@ -32,7 +32,7 @@ defmodule Janus.PolicyTest do
 
       assert {:ok, ^t1} = Auth.authorize(t1, :read, p1)
       assert :error = Auth.authorize(t2, :read, p1)
-      assert [%Thread{id: ^t1_id}] = Auth.filter_authorized(Thread, :read, p1) |> Repo.all()
+      assert [%Thread{id: ^t1_id}] = Auth.scope(Thread, :read, p1) |> Repo.all()
 
       # archived or not t2
       p2 =
@@ -42,7 +42,7 @@ defmodule Janus.PolicyTest do
 
       assert {:ok, ^t1} = Auth.authorize(t1, :read, p2)
       assert :error = Auth.authorize(t2, :read, p2)
-      assert [%Thread{id: ^t1_id}] = Auth.filter_authorized(Thread, :read, p2) |> Repo.all()
+      assert [%Thread{id: ^t1_id}] = Auth.scope(Thread, :read, p2) |> Repo.all()
 
       # not archived or t1
       p3 =
@@ -51,7 +51,7 @@ defmodule Janus.PolicyTest do
 
       assert {:ok, ^t1} = Auth.authorize(t1, :read, p3)
       assert :error = Auth.authorize(t2, :read, p3)
-      assert [%Thread{id: ^t1_id}] = Auth.filter_authorized(Thread, :read, p3) |> Repo.all()
+      assert [%Thread{id: ^t1_id}] = Auth.scope(Thread, :read, p3) |> Repo.all()
 
       # (not archived or t1) and not t1
       p4 =
@@ -64,7 +64,7 @@ defmodule Janus.PolicyTest do
 
       assert :error = Auth.authorize(t1, :read, p4)
       assert :error = Auth.authorize(t2, :read, p4)
-      assert [] = Auth.filter_authorized(Thread, :read, p4) |> Repo.all()
+      assert [] = Auth.scope(Thread, :read, p4) |> Repo.all()
 
       # (not archived or t1) or t2
       p5 =
@@ -77,7 +77,7 @@ defmodule Janus.PolicyTest do
 
       assert {:ok, ^t1} = Auth.authorize(t1, :read, p5)
       assert {:ok, ^t2} = Auth.authorize(t2, :read, p5)
-      assert [%Thread{}, %Thread{}] = Auth.filter_authorized(Thread, :read, p5) |> Repo.all()
+      assert [%Thread{}, %Thread{}] = Auth.scope(Thread, :read, p5) |> Repo.all()
 
       # (not archived and not t1) or t1
       p6 =
@@ -90,7 +90,7 @@ defmodule Janus.PolicyTest do
 
       assert {:ok, ^t1} = Auth.authorize(t1, :read, p6)
       assert :error = Auth.authorize(t2, :read, p6)
-      assert [%Thread{id: ^t1_id}] = Auth.filter_authorized(Thread, :read, p6) |> Repo.all()
+      assert [%Thread{id: ^t1_id}] = Auth.scope(Thread, :read, p6) |> Repo.all()
     end
 
     test "should accept a list of actions" do
@@ -104,16 +104,14 @@ defmodule Janus.PolicyTest do
       assert {:ok, ^thread} = Auth.authorize(thread, :read, policy)
       assert {:ok, _thread} = Auth.authorize(%Thread{}, :create, policy)
 
-      assert [%Thread{id: ^thread_id}] =
-               Auth.filter_authorized(Thread, :read, policy) |> Repo.all()
+      assert [%Thread{id: ^thread_id}] = Auth.scope(Thread, :read, policy) |> Repo.all()
 
       denied = thread_fixture(%{title: "denied"})
 
       assert :error = Auth.authorize(denied, :read, policy)
       assert :error = Auth.authorize(denied, :edit, policy)
 
-      assert [%Thread{id: ^thread_id}] =
-               Auth.filter_authorized(Thread, :read, policy) |> Repo.all()
+      assert [%Thread{id: ^thread_id}] = Auth.scope(Thread, :read, policy) |> Repo.all()
     end
 
     test "should combine multiple option clauses as a logical-and" do
@@ -125,7 +123,7 @@ defmodule Janus.PolicyTest do
 
       assert {:ok, ^t1} = Auth.authorize(t1, :edit, p1)
       assert :error = Auth.authorize(t2, :edit, p1)
-      assert [%{id: ^t1_id}] = Auth.filter_authorized(Thread, :edit, p1) |> Repo.all()
+      assert [%{id: ^t1_id}] = Auth.scope(Thread, :edit, p1) |> Repo.all()
 
       p2 =
         %Janus.Policy{}
@@ -133,7 +131,7 @@ defmodule Janus.PolicyTest do
 
       assert :error = Auth.authorize(t1, :edit, p2)
       assert {:ok, ^t2} = Auth.authorize(t2, :edit, p2)
-      assert [%{id: ^t2_id}] = Auth.filter_authorized(Thread, :edit, p2) |> Repo.all()
+      assert [%{id: ^t2_id}] = Auth.scope(Thread, :edit, p2) |> Repo.all()
     end
   end
 end
