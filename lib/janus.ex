@@ -86,7 +86,7 @@ defmodule Janus do
 
   See the `Janus.Authorization` documentation for more.
 
-  ## Integration with `Ecto`
+  ## Integration with `Ecto.Query`
 
   The primary assumption that Janus makes is that your resources are backed by an
   `Ecto.Schema`. Using Ecto's schema reflection capabilities, Janus is able to use the
@@ -106,6 +106,25 @@ defmodule Janus do
       |> limit(5)
 
   This integration with Ecto queries is main reason Janus exists.
+
+  ## Integration with `Ecto.Changeset`
+
+  Janus provides an additional utility, `Janus.Authorization.validate_authorized/4`, that
+  can be used to expose authorization failures as a validation error on a changeset.
+
+  This is especially useful when updating a resource, where you may want to check both
+  that the resource is authorized prior to the update and that it is _still_ authorized
+  after applying the changes. Here's how this would look using Janus:
+
+      def update_post(post, attrs, current_user) do
+        post
+        |> Post.changeset(attrs)
+        |> Policy.validate_authorized(:update, current_user)
+        |> Repo.update()
+      end
+
+  In the example above, if the post is unauthorized either before or after applying the
+  changes, the operation would fail.
   """
 
   require Ecto.Query
@@ -158,6 +177,11 @@ defmodule Janus do
       @impl Janus.Authorization
       def scope(query_or_schema, action, actor, opts \\ []) do
         Janus.Authorization.scope(query_or_schema, action, policy_for(actor), opts)
+      end
+
+      @impl Janus.Authorization
+      def validate_authorized(changeset, action, actor, opts \\ []) do
+        Janus.Authorization.validate_authorized(changeset, action, policy_for(actor), opts)
       end
     end
   end

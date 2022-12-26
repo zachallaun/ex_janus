@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## v0.2.0-dev
 
+### Added
+
+- `Janus.Authorization.validate_authorized/4` to expose authorization failure as validation errors on an Ecto changeset.
+
 ### Changed
 
 - (Breaking) All instances of `filter_authorized` replaced by `scope` (no changes to functionality).

@@ -193,7 +193,8 @@ policy
 |> allow(:edit, Post, ...)
 |> allow("edit", Post, ...)
 |> allow(%Action{type: :edit}, Post, ...)
-# lists are special-cased to allow multiple actions to share conditions
+# lists are special-cased to allow multiple
+# actions to share conditions
 |> allow([:read, :edit], Post, ...)
 ```
 
@@ -324,7 +325,7 @@ defmodule MyApp.MessageBoard do
 end
 ```
 
-### Authorizing an action on a resource
+### Authorizing an action using `authorize/4`
 
 ```elixir
 def update_post(%Post{} = post, attrs \\ %{}, user_or_policy) do
@@ -332,12 +333,44 @@ def update_post(%Post{} = post, attrs \\ %{}, user_or_policy) do
     {:ok, post} ->
       post
       |> Post.changeset(attrs)
-      |> Repo.insert()
+      |> Repo.update()
 
     {:error, :not_authorized} ->
       {:error, :not_authorized}
   end
 end
+```
+
+```elixir
+iex> MyApp.MessageBoard.update_post(authorized_post, %{}, some_user)
+{:ok, %Post{}}
+
+iex> MyApp.MessageBoard.update_post(unauthorized_post, %{}, some_user)
+{:error, :not_authorized}
+```
+
+### Authorizing an action using `validate_authorized/4`
+
+```elixir
+def update_post(%Post{} = post, attrs \\ %{}, user_or_policy) do
+  post
+  |> Post.changeset(attrs)
+  |> validate_authorized(:edit, user_or_policy)
+  |> Repo.update()
+end
+```
+
+```elixir
+iex> MyApp.MessageBoard.update_post(authorized_post, %{}, some_user)
+{:ok, %Post{}}
+
+iex> {MyApp.MessageBoard.update_post(unauthorized_post, %{}, some_user)
+{:error,
+ %Ecto.Changeset{
+   errors: [
+    current_actor: {"is not authorized to change this resource", []}
+   ]
+ }}
 ```
 
 ### Fetching authorized resources
