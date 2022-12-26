@@ -1,21 +1,24 @@
 # Janus
 
-Flexible and composable authorization for resources defined by an `Ecto.Schema`.
+Authorization superpowers for your `Ecto` schemas.
 
-Janus provides an API for defining authorization policies that can be used both as
-filters in Ecto queries and to authorize actions on loaded resources with minimal to no
-duplication of authorization logic.
+Janus prioritizes:
+
+* Single source of truth: authorization rules should be defined once and used for authorizing individual actions as well as composing Ecto queries.
+* Minimal library footprint: favor a small set of powerful that applications can use to expose their own optimal authorization API.
+* Minimal application footprint: where possible, "hide" Janus behind user-controlled policy modules that implement well-defined behaviours.
+* Escape hatches: easily "drop down" to your own code when the declarative API doesn't cut it.
 
 [**Documentation**](https://hexdocs.pm/ex_janus/Janus.html)
 
 ## Installation
 
-Janus is pre-0.1 and can be installed by adding `ex_janus` as a git dependency in `mix.exs`:
+Janus can be installed by adding `ex_janus` to your deps in `mix.exs`:
 
 ```elixir
 defp deps do
   [
-    {:ex_janus, github: "zachallaun/ex_janus"}
+    {:ex_janus, "~> 0.1.0"}
   ]
 end
 ```

@@ -19,7 +19,7 @@ defmodule Janus.MixProject do
       preferred_cli_env: preferred_cli_env(),
 
       # Hex
-      description: "Flexible and composable authorization for resources defined by Ecto schemas",
+      description: "Authorization superpowers for Ecto schemas",
       package: package(),
 
       # Docs

@@ -1,10 +1,17 @@
 defmodule Janus do
   @moduledoc """
-  Flexible and composable authorization for resources defined by an `Ecto.Schema`.
+  Authorization superpowers for your `Ecto` schemas.
 
-  Janus provides an API for defining authorization policies that can be used both as
-  filters in Ecto queries and to authorize actions on loaded resources with minimal to no
-  duplication of authorization logic.
+  Janus prioritizes:
+
+    * Single source of truth: authorization rules should be defined once and used for
+      authorizing individual actions as well as composing Ecto queries.
+    * Minimal library footprint: favor a small set of powerful that applications can use
+      to expose their own optimal authorization API.
+    * Minimal application footprint: where possible, "hide" Janus behind user-controlled
+      policy modules that implement well-defined behaviours.
+    * Escape hatches: easily "drop down" to your own code when the declarative API doesn't
+      cut it.
 
   Janus is split into two primary components:
 
