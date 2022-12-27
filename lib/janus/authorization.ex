@@ -188,6 +188,11 @@ defmodule Janus.Authorization do
 
   Returns `{:ok, resource}` if authorized, otherwise `{:error, :not_authorized}`.
 
+  ## Options
+
+    * `:repo`
+    * `:load_associations`
+
   ## Examples
 
       iex> MyPolicy.authorize(%MyResource{}, :read, actor) # accepts an actor
@@ -201,7 +206,9 @@ defmodule Janus.Authorization do
   """
   @spec authorize(Ecto.Schema.t(), Janus.action(), Policy.t(), keyword()) ::
           {:ok, Ecto.Schema.t()} | {:error, :not_authorized}
-  def authorize(%schema{} = resource, action, policy, _opts \\ []) do
+  def authorize(%schema{} = resource, action, policy, opts \\ []) do
+    opts = Keyword.validate!(opts, [:repo, :load_associations])
+    policy = Policy.merge_config(policy, opts)
     rule = Policy.rule_for(policy, action, schema)
 
     with {:match, resource} <- run_rule(rule, :allow, resource, policy),
@@ -214,49 +221,73 @@ defmodule Janus.Authorization do
 
   defp run_rule(%Policy.Rule{} = rule, attr, resource, policy) do
     conditions = Map.fetch!(rule, attr)
+    run_rule(conditions, resource, policy)
+  end
 
-    case Enum.any?(conditions, &condition_match?(&1, policy, resource)) do
-      true -> {:match, resource}
-      false -> {:no_match, resource}
+  defp run_rule([condition | rest], resource, policy) do
+    case condition_match(condition, resource, policy) do
+      {:match, resource} -> {:match, resource}
+      {:no_match, resource} -> run_rule(rest, resource, policy)
     end
   end
 
-  defp condition_match?([], _policy, _resource), do: true
+  defp run_rule([], resource, _policy), do: {:no_match, resource}
 
-  defp condition_match?(condition, policy, resource) when is_list(condition) do
-    Enum.all?(condition, &condition_match?(&1, policy, resource))
-  end
+  defp condition_match([], resource, _policy), do: {:match, resource}
 
-  defp condition_match?({:where, clause}, policy, resource) do
-    clause_match?(clause, policy, resource)
-  end
-
-  defp condition_match?({:where_not, clause}, policy, resource) do
-    !clause_match?(clause, policy, resource)
-  end
-
-  defp condition_match?({:or, cond1, conditions}, policy, resource) do
-    condition_match?(cond1, policy, resource) || condition_match?(conditions, policy, resource)
-  end
-
-  defp clause_match?(list, policy, resource) when is_list(list) do
-    Enum.all?(list, &clause_match?(&1, policy, resource))
-  end
-
-  defp clause_match?({:__derived__, attr, action}, policy, %schema{} = resource) do
-    rule = Policy.rule_for(policy, action, schema)
-
-    case run_rule(rule, attr, resource, policy) do
-      {:match, _} -> true
-      {:no_match, _} -> false
+  defp condition_match([condition | rest], resource, policy) do
+    case condition_match(condition, resource, policy) do
+      {:match, resource} -> condition_match(rest, resource, policy)
+      {:no_match, resource} -> {:no_match, resource}
     end
   end
 
-  defp clause_match?({field, value}, policy, %schema{} = resource) do
-    if field in schema.__schema__(:associations) do
-      clause_match?(value, policy, fetch_associated!(resource, field))
-    else
-      compare_field(resource, field, value)
+  defp condition_match({:where, clause}, resource, policy) do
+    clause_match(clause, resource, policy)
+  end
+
+  defp condition_match({:where_not, clause}, resource, policy) do
+    case clause_match(clause, resource, policy) do
+      {:match, resource} -> {:no_match, resource}
+      {:no_match, resource} -> {:match, resource}
+    end
+  end
+
+  defp condition_match({:or, condition, conditions}, resource, policy) do
+    case condition_match(condition, resource, policy) do
+      {:match, resource} -> {:match, resource}
+      {:no_match, resource} -> condition_match(conditions, resource, policy)
+    end
+  end
+
+  defp clause_match([clause | clauses], resource, policy) do
+    case clause_match(clause, resource, policy) do
+      {:match, resource} -> clause_match(clauses, resource, policy)
+      {:no_match, resource} -> {:no_match, resource}
+    end
+  end
+
+  defp clause_match([], resource, _policy), do: {:match, resource}
+
+  defp clause_match({:__derived__, attr, action}, %schema{} = resource, policy) do
+    policy
+    |> Policy.rule_for(action, schema)
+    |> run_rule(attr, resource, policy)
+  end
+
+  defp clause_match({field, value_or_assoc}, %schema{} = resource, policy) do
+    cond do
+      field in schema.__schema__(:associations) ->
+        {match_or_no_match, assoc} =
+          clause_match(value_or_assoc, fetch_associated!(resource, field, policy), policy)
+
+        {match_or_no_match, Map.put(resource, field, assoc)}
+
+      compare_field(resource, field, value_or_assoc) ->
+        {:match, resource}
+
+      true ->
+        {:no_match, resource}
     end
   end
 
@@ -272,7 +303,13 @@ defmodule Janus.Authorization do
     Map.get(resource, field) == value
   end
 
-  defp fetch_associated!(resource, field) do
+  defp fetch_associated!(resource, field, %{config: %{load_associations: true, repo: repo}})
+       when not is_nil(repo) do
+    resource = repo.preload(resource, field)
+    Map.fetch!(resource, field)
+  end
+
+  defp fetch_associated!(resource, field, _policy) do
     case Map.fetch!(resource, field) do
       %Ecto.Association.NotLoaded{} ->
         raise ArgumentError, "field #{inspect(field)} must be preloaded on #{inspect(resource)}"
@@ -289,7 +326,8 @@ defmodule Janus.Authorization do
   ## Options
 
     * `:error_key` - the key to which the error will be added if authorization fails,
-      defaults to `:current_actor`
+      defaults to `:current_actor` or the `:validation_error_key` in your policy
+      configuration (see `Janus` "Configuration" for more info)
     * `:pre_message` - the message in case the authorization check fails on the resource
       prior to applying changes, defaults to "is not authorized to change this resource"
     * `:post_message` - the message in case the authorization check fails on the resource
@@ -302,7 +340,12 @@ defmodule Janus.Authorization do
       ...> |> MyPolicy.validate_authorized(:update, current_user)
       %Ecto.Changeset{}
   """
-  @spec authorize(Ecto.Changeset.t(Ecto.Schema.t()), Janus.action(), Policy.t(), keyword()) ::
+  @spec validate_authorized(
+          Ecto.Changeset.t(Ecto.Schema.t()),
+          Janus.action(),
+          Policy.t(),
+          keyword()
+        ) ::
           Ecto.Changeset.t(Ecto.Schema.t())
   def validate_authorized(%Ecto.Changeset{} = changeset, action, policy, opts \\ []) do
     opts =

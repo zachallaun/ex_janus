@@ -45,12 +45,12 @@ defmodule Janus.Policy.Rule do
   end
 
   defp parse_opts!(opts) do
-    with {:keyword, true} <- {:keyword, Keyword.keyword?(opts)},
+    with true <- Keyword.keyword?(opts),
          [] <- opts |> Keyword.keys() |> Enum.uniq() |> Kernel.--(@valid_options) do
       combine(opts)
     else
-      {:keyword, false} -> invalid_opts!(opts)
-      opts -> invalid_opts!(opts)
+      opts when is_list(opts) -> invalid_opts!(opts)
+      _ -> invalid_opts!(opts)
     end
   end
 

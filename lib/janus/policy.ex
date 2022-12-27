@@ -139,12 +139,14 @@ defmodule Janus.Policy do
   alias __MODULE__.Rule
 
   @type t :: %Policy{
+          module: module(),
+          config: map(),
           rules: %{
             {Janus.schema_module(), Janus.action()} => Rule.t()
           }
         }
 
-  defstruct rules: %{}
+  defstruct [:module, config: %{}, rules: %{}]
 
   @doc """
   Returns the policy for the given actor.
@@ -153,14 +155,23 @@ defmodule Janus.Policy do
   """
   @callback policy_for(t, Janus.actor()) :: t
 
-  @janus_hooks :__janus_hooks__
+  @hooks :__janus_hooks__
+  @config :__janus_policy_config__
+
+  @config_defaults [
+    repo: nil,
+    load_associations: false,
+    validation_error_key: :current_actor
+  ]
 
   @doc false
-  defmacro __using__(_opts) do
+  defmacro __using__(opts \\ []) do
     quote location: :keep do
       @behaviour Janus.Policy
       @before_compile Janus.Policy
-      Module.register_attribute(__MODULE__, unquote(@janus_hooks), accumulate: true)
+      Module.register_attribute(__MODULE__, unquote(@hooks), accumulate: true)
+      Module.register_attribute(__MODULE__, unquote(@config), persist: true)
+      Module.put_attribute(__MODULE__, unquote(@config), unquote(opts))
 
       import Janus.Policy, except: [rule_for: 3]
 
@@ -170,7 +181,12 @@ defmodule Janus.Policy do
       See `c:Janus.Policy.policy_for/2` for more information.
       """
       def policy_for(%Janus.Policy{} = policy), do: policy
-      def policy_for(actor), do: policy_for(%Janus.Policy{}, actor)
+
+      def policy_for(actor) do
+        __MODULE__
+        |> Janus.Policy.new()
+        |> policy_for(actor)
+      end
     end
   end
 
@@ -178,7 +194,7 @@ defmodule Janus.Policy do
   defmacro __before_compile__(env) do
     hooks =
       env.module
-      |> Module.get_attribute(@janus_hooks)
+      |> Module.get_attribute(@hooks)
       |> Enum.reverse()
 
     if hooks != [] do
@@ -193,6 +209,30 @@ defmodule Janus.Policy do
         end
       end
     end
+  end
+
+  @doc false
+  def new(module) do
+    config =
+      module.__info__(:attributes)
+      |> Keyword.get(@config, [])
+      |> Keyword.validate!(@config_defaults)
+      |> Enum.into(%{})
+
+    %Janus.Policy{module: module, config: config}
+  end
+
+  @doc false
+  def merge_config(%Policy{} = policy, []), do: policy
+
+  def merge_config(%Policy{} = policy, config) do
+    config =
+      config
+      |> Keyword.new()
+      |> Keyword.validate!(Keyword.keys(@config_defaults))
+      |> Enum.into(policy.config || %{})
+
+    %{policy | config: config}
   end
 
   @doc false
@@ -292,7 +332,7 @@ defmodule Janus.Policy do
   """
   defmacro before_policy_for(hook) do
     quote do
-      Module.put_attribute(__MODULE__, unquote(@janus_hooks), unquote(hook))
+      Module.put_attribute(__MODULE__, unquote(@hooks), unquote(hook))
     end
   end
 

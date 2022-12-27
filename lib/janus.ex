@@ -125,6 +125,34 @@ defmodule Janus do
 
   In the example above, if the post is unauthorized either before or after applying the
   changes, the operation would fail.
+
+  ## Configuration
+
+  Some defaults can be configured by passing them as options when invoking `use Janus`.
+  Those are:
+
+    * `:repo` - `Ecto.Repo` used to load associations when required by your authorization
+      rules
+    * `:load_associations` - Load associations when required by your authorization rules
+      (requires `:repo` config option to be set or to be passed explicitly at the call
+      site), defaults to `false`
+    * `:validation_error_key` - the default `:error_key` used by
+      `Janus.Authorization.validate_authorized/4`, defaults to `:current_actor` (see
+      function docs for more info)
+
+  For example:
+
+      defmodule MyApp.Policy do
+          use Janus,
+            repo: MyApp.Repo,
+            load_associations: true,
+            validation_error_key: :current_user
+
+          # ...
+      end
+
+  These defaults will be referenced in the `Janus.Authorization` documentation where they
+  are used.
   """
 
   require Ecto.Query
@@ -143,25 +171,26 @@ defmodule Janus do
       hooks (see `Janus.Policy` for more)
     * injects implementations for the `Janus.Authorization` behaviour
 
+  ## Options
+
+  See "Configuration" section for details.
+
   ## Example
 
       defmodule MyApp.Policy do
-        use Janus
+        use Janus, repo: MyApp.Repo
 
         @impl true
         def policy_for(policy, _actor) do
           policy
         end
       end
-
-      # imports `authorize`, `scope`, and `any_authorized?`
-      use MyApp.Policy
   """
-  defmacro __using__(_opts) do
+  defmacro __using__(opts \\ []) do
     quote location: :keep do
       @behaviour Janus.Authorization
 
-      use Janus.Policy
+      use Janus.Policy, unquote(opts)
       require Janus
 
       @impl Janus.Authorization

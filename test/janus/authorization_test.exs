@@ -417,6 +417,40 @@ defmodule Janus.AuthorizationTest do
       end
     end
 
+    test "load required associations if `:repo` and `:load_associations` are set" do
+      user = user_fixture()
+      thread = thread_fixture(%{creator_id: user.id})
+      policy = allow(%Janus.Policy{}, :read, Thread, where: [creator: [id: user.id]])
+
+      thread = Ecto.reset_fields(thread, [:creator])
+
+      assert %{creator: %Ecto.Association.NotLoaded{}} = thread
+
+      assert {:ok, thread} =
+               Auth.authorize(thread, :read, policy, repo: Repo, load_associations: true)
+
+      assert %{creator: %User{}} = thread
+    end
+
+    test "load required nested associations if `:repo` and `:load_associations` are set" do
+      user = user_fixture()
+      thread = thread_fixture(%{creator_id: user.id})
+      post = post_fixture(%{thread_id: thread.id, author_id: user.id})
+
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Post, where: [thread: [creator: [id: user.id]]])
+
+      post = Ecto.reset_fields(post, [:thread])
+
+      assert %{thread: %Ecto.Association.NotLoaded{}} = post
+
+      assert {:ok, post} =
+               Auth.authorize(post, :read, policy, repo: Repo, load_associations: true)
+
+      assert %{thread: %Thread{creator: %User{}}} = post
+    end
+
     test "should allow associations in subsequent clauses" do
       t1 = thread_fixture()
       %{id: t2_id} = t2 = thread_fixture()
