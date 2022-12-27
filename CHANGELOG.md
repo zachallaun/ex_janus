@@ -7,6 +7,8 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - `Janus.Authorization.validate_authorized/4` to expose authorization failure as validation errors on an Ecto changeset.
+- Configuration for some options when invoking `use Janus`.
+- Support loading associations when required by authorization rules in `Janus.Authorization.authorize/4`.
 
 ### Changed
 

@@ -190,8 +190,11 @@ defmodule Janus.Authorization do
 
   ## Options
 
-    * `:repo`
-    * `:load_associations`
+    * `:load_associations` - Whether to load associations required by policy
+      authorization rules, defaults to `false` unless configured on your policy module
+    * `:repo` - Ecto repository to use when loading required associations if
+      `:load_associations` is set to `true`, defaults to `nil` unless configured on your
+      policy module
 
   ## Examples
 
