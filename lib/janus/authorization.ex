@@ -214,14 +214,29 @@ defmodule Janus.Authorization do
     policy = Policy.merge_config(policy, opts)
     rule = Policy.rule_for(policy, action, schema)
 
-    with {:match, resource} <- run_rule(rule, :allow, resource, policy),
-         {:no_match, resource} <- run_rule(rule, :deny, resource, policy) do
+    with {:ok, resource} <- run_rule(rule, :allow, resource, policy),
+         {:error, resource} <- run_rule(rule, :deny, resource, policy) do
       {:ok, resource}
     else
       _ -> {:error, :not_authorized}
     end
   end
 
+  # Conditions vs. Clauses
+  #
+  # When creating a policy, every call to `allow`/`deny` creates a condition, and
+  # each `:where`, `:where_not`, etc. inside represents a clause in that condition.
+  #
+  # So if we consider the following:
+  #
+  #     policy
+  #     |> allow(:read, Thing, where: [some_field: :foo], where_not: [other_field: :bar])
+  #     |> allow(:read, Thing, where: [some_field: :baz])
+  #
+  # This policy defines two conditions for reading Thing -- if one of them matches,
+  # it allows reading. For a condition to match, all of its clauses must match. The
+  # first `allow` has two clauses and the second has only one.
+  #
   defp run_rule(%Policy.Rule{} = rule, attr, resource, policy) do
     conditions = Map.fetch!(rule, attr)
     run_rule(conditions, resource, policy)
@@ -229,19 +244,19 @@ defmodule Janus.Authorization do
 
   defp run_rule([condition | rest], resource, policy) do
     case condition_match(condition, resource, policy) do
-      {:match, resource} -> {:match, resource}
-      {:no_match, resource} -> run_rule(rest, resource, policy)
+      {:ok, resource} -> {:ok, resource}
+      {:error, resource} -> run_rule(rest, resource, policy)
     end
   end
 
-  defp run_rule([], resource, _policy), do: {:no_match, resource}
+  defp run_rule([], resource, _policy), do: {:error, resource}
 
-  defp condition_match([], resource, _policy), do: {:match, resource}
+  defp condition_match([], resource, _policy), do: {:ok, resource}
 
   defp condition_match([condition | rest], resource, policy) do
     case condition_match(condition, resource, policy) do
-      {:match, resource} -> condition_match(rest, resource, policy)
-      {:no_match, resource} -> {:no_match, resource}
+      {:ok, resource} -> condition_match(rest, resource, policy)
+      {:error, resource} -> {:error, resource}
     end
   end
 
@@ -251,26 +266,26 @@ defmodule Janus.Authorization do
 
   defp condition_match({:where_not, clause}, resource, policy) do
     case clause_match(clause, resource, policy) do
-      {:match, resource} -> {:no_match, resource}
-      {:no_match, resource} -> {:match, resource}
+      {:ok, resource} -> {:error, resource}
+      {:error, resource} -> {:ok, resource}
     end
   end
 
   defp condition_match({:or, condition, conditions}, resource, policy) do
     case condition_match(condition, resource, policy) do
-      {:match, resource} -> {:match, resource}
-      {:no_match, resource} -> condition_match(conditions, resource, policy)
+      {:ok, resource} -> {:ok, resource}
+      {:error, resource} -> condition_match(conditions, resource, policy)
     end
   end
 
   defp clause_match([clause | clauses], resource, policy) do
     case clause_match(clause, resource, policy) do
-      {:match, resource} -> clause_match(clauses, resource, policy)
-      {:no_match, resource} -> {:no_match, resource}
+      {:ok, resource} -> clause_match(clauses, resource, policy)
+      {:error, resource} -> {:error, resource}
     end
   end
 
-  defp clause_match([], resource, _policy), do: {:match, resource}
+  defp clause_match([], resource, _policy), do: {:ok, resource}
 
   defp clause_match({:__derived__, attr, action}, %schema{} = resource, policy) do
     policy
@@ -286,23 +301,23 @@ defmodule Janus.Authorization do
 
         {match_or_no_match, Map.put(resource, field, assoc)}
 
-      compare_field(resource, field, value_or_assoc) ->
-        {:match, resource}
+      field_match?(resource, field, value_or_assoc) ->
+        {:ok, resource}
 
       true ->
-        {:no_match, resource}
+        {:error, resource}
     end
   end
 
-  defp compare_field(resource, field, fun) when is_function(fun, 3) do
+  defp field_match?(resource, field, fun) when is_function(fun, 3) do
     fun.(:boolean, resource, field)
   end
 
-  defp compare_field(_resource, _field, fun) when is_function(fun) do
+  defp field_match?(_resource, _field, fun) when is_function(fun) do
     raise ArgumentError, "permission functions must take 3 arguments (#{inspect(fun)})"
   end
 
-  defp compare_field(resource, field, value) do
+  defp field_match?(resource, field, value) do
     Map.get(resource, field) == value
   end
 
