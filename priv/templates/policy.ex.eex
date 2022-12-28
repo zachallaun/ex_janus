@@ -66,4 +66,47 @@ defmodule <%= module %> do
       {:error, :not_authorized}
     end
   end
+
+  @doc """
+  Validates that the resource being changed is authorized both before and after applying
+  changes.
+
+  ## Options
+
+    * `:error_key` - the key to which the error will be added if authorization fails,
+      defaults to `:current_user`
+    * `:pre_message` - the message in case the authorization check fails on the resource
+      prior to applying changes, defaults to "is not authorized to change this resource"
+    * `:post_message` - the message in case the authorization check fails on the resource
+      after applying changes, defaults to "is not authorized to make these changes"
+
+  ## Examples
+
+      iex> %MyResource{}
+      ...> |> MyResource.changeset(attrs)
+      ...> |> MyPolicy.validate_authorized(:update, current_user)
+      %Ecto.Changeset{}
+  """
+  def validate_authorized(%Ecto.Changeset{} = changeset, action, actor_or_policy, opts \\ []) do
+    policy = policy_for(actor_or_policy)
+
+    opts =
+      Keyword.validate!(opts,
+        error_key: :current_user,
+        pre_message: "is not authorized to change this resource",
+        post_message: "is not authorized to make these changes"
+      )
+
+    with {:pre, {:ok, data}} <- {:pre, authorize(changeset.data, action, policy)},
+         new_data <- Ecto.Changeset.apply_changes(changeset),
+         {:post, {:ok, _data}} <- {:post, authorize(new_data, action, policy)} do
+      %{changeset | data: data}
+    else
+      {:pre, {:error, :not_authorized}} ->
+        Ecto.Changeset.add_error(changeset, opts[:error_key], opts[:pre_message], policy: policy)
+
+      {:post, {:error, :not_authorized}} ->
+        Ecto.Changeset.add_error(changeset, opts[:error_key], opts[:post_message], policy: policy)
+    end
+  end
 end
