@@ -107,25 +107,6 @@ defmodule Janus do
 
   This integration with Ecto queries is main reason Janus exists.
 
-  ## Integration with `Ecto.Changeset`
-
-  Janus provides an additional utility, `Janus.Authorization.validate_authorized/4`, that
-  can be used to expose authorization failures as a validation error on a changeset.
-
-  This is especially useful when updating a resource, where you may want to check both
-  that the resource is authorized prior to the update and that it is _still_ authorized
-  after applying the changes. Here's how this would look using Janus:
-
-      def update_post(post, attrs, current_user) do
-        post
-        |> Post.changeset(attrs)
-        |> Policy.validate_authorized(:update, current_user)
-        |> Repo.update()
-      end
-
-  In the example above, if the post is unauthorized either before or after applying the
-  changes, the operation would fail.
-
   ## Configuration
 
   Some defaults can be configured by passing them as options when invoking `use Janus`.
@@ -136,17 +117,13 @@ defmodule Janus do
     * `:load_associations` - Load associations when required by your authorization rules
       (requires `:repo` config option to be set or to be passed explicitly at the call
       site), defaults to `false`
-    * `:validation_error_key` - the default `:error_key` used by
-      `Janus.Authorization.validate_authorized/4`, defaults to `:current_actor` (see
-      function docs for more info)
 
   For example:
 
       defmodule MyApp.Policy do
           use Janus,
             repo: MyApp.Repo,
-            load_associations: true,
-            validation_error_key: :current_user
+            load_associations: true
 
           # ...
       end
@@ -206,11 +183,6 @@ defmodule Janus do
       @impl Janus.Authorization
       def scope(query_or_schema, action, actor, opts \\ []) do
         Janus.Authorization.scope(query_or_schema, action, policy_for(actor), opts)
-      end
-
-      @impl Janus.Authorization
-      def validate_authorized(changeset, action, actor, opts \\ []) do
-        Janus.Authorization.validate_authorized(changeset, action, policy_for(actor), opts)
       end
     end
   end

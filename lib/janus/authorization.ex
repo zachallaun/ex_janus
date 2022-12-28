@@ -10,8 +10,6 @@ defmodule Janus.Authorization do
       results to only those that are authorized
     * `any_authorized?/3` - checks whether the given actor/policy has _any_ access to
       the given schema for the given action
-    * `validate_authorized/4` - authorize an action on an `%Ecto.Changeset{}`, adding a
-      validation error if not authorized
 
   These functions will usually be called from your policy module directly, since wrappers
   that accept either a policy or an actor are injected when you invoke `use Janus`.
@@ -32,13 +30,6 @@ defmodule Janus.Authorization do
 
   @callback scope(filterable, Janus.action(), Janus.actor() | Policy.t(), keyword()) ::
               Ecto.Query.t()
-
-  @callback validate_authorized(
-              Ecto.Changeset.t(Ecto.Schema.t()),
-              Janus.action(),
-              Janus.actor(),
-              keyword()
-            ) :: Ecto.Changeset.t(Ecto.Schema.t())
 
   @doc """
   Checks whether any permissions are defined for the given schema, action, and actor.
@@ -334,55 +325,6 @@ defmodule Janus.Authorization do
 
       value ->
         value
-    end
-  end
-
-  @doc """
-  Validates that the resource being changed is authorized both before and after applying
-  changes.
-
-  ## Options
-
-    * `:error_key` - the key to which the error will be added if authorization fails,
-      defaults to `:current_actor` or the `:validation_error_key` in your policy
-      configuration (see `Janus` "Configuration" for more info)
-    * `:pre_message` - the message in case the authorization check fails on the resource
-      prior to applying changes, defaults to "is not authorized to change this resource"
-    * `:post_message` - the message in case the authorization check fails on the resource
-      after applying changes, defaults to "is not authorized to make these changes"
-
-  ## Examples
-
-      iex> %MyResource{}
-      ...> |> MyResource.changeset(attrs)
-      ...> |> MyPolicy.validate_authorized(:update, current_user)
-      %Ecto.Changeset{}
-  """
-  @spec validate_authorized(
-          Ecto.Changeset.t(Ecto.Schema.t()),
-          Janus.action(),
-          Policy.t(),
-          keyword()
-        ) ::
-          Ecto.Changeset.t(Ecto.Schema.t())
-  def validate_authorized(%Ecto.Changeset{} = changeset, action, policy, opts \\ []) do
-    opts =
-      Keyword.validate!(opts,
-        error_key: :current_actor,
-        pre_message: "is not authorized to change this resource",
-        post_message: "is not authorized to make these changes"
-      )
-
-    with {:pre, {:ok, data}} <- {:pre, authorize(changeset.data, action, policy)},
-         new_data <- Ecto.Changeset.apply_changes(changeset),
-         {:post, {:ok, _data}} <- {:post, authorize(new_data, action, policy)} do
-      %{changeset | data: data}
-    else
-      {:pre, {:error, :not_authorized}} ->
-        Ecto.Changeset.add_error(changeset, opts[:error_key], opts[:pre_message], policy: policy)
-
-      {:post, {:error, :not_authorized}} ->
-        Ecto.Changeset.add_error(changeset, opts[:error_key], opts[:post_message], policy: policy)
     end
   end
 end

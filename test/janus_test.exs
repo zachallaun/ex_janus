@@ -46,8 +46,7 @@ defmodule JanusTest do
       assert %Janus.Policy{
                config: %{
                  repo: nil,
-                 load_associations: false,
-                 validation_error_key: :current_actor
+                 load_associations: false
                }
              } = ExamplePolicy.policy_for(:user)
     end
@@ -135,8 +134,7 @@ defmodule JanusTest do
           defmodule AllConfigOptions do
             use Janus,
               repo: Example.Repo,
-              load_associations: true,
-              validation_error_key: :current_user
+              load_associations: true
 
             @impl true
             def policy_for(policy, _actor), do: policy
@@ -146,8 +144,7 @@ defmodule JanusTest do
 
       assert %Janus.Policy{config: config} = module.policy_for(:user)
 
-      assert %{repo: Example.Repo, load_associations: true, validation_error_key: :current_user} =
-               config
+      assert %{repo: Example.Repo, load_associations: true} = config
     end
 
     test "raise when given an invalid key" do

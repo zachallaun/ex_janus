@@ -160,8 +160,7 @@ defmodule Janus.Policy do
 
   @config_defaults [
     repo: nil,
-    load_associations: false,
-    validation_error_key: :current_actor
+    load_associations: false
   ]
 
   @doc false

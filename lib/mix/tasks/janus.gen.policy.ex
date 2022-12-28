@@ -13,7 +13,8 @@ defmodule Mix.Tasks.Janus.Gen.Policy do
   ## Options
 
     * `--module` - The name of the generated module, defaults to `AppName.Policy`
-
+    * `--app` - The name of the application namespace, defaults to your application name
+      camelized, e.g. `AppName`
     * `--path` - The path (including filename) for the generated module, defaults to
       `lib/app_name/policy.ex`
   """
@@ -37,13 +38,14 @@ defmodule Mix.Tasks.Janus.Gen.Policy do
   end
 
   defp parse_args(args) do
-    {opts, []} = OptionParser.parse!(args, strict: [module: :string, path: :string])
+    options = [module: :string, path: :string, app: :string]
+    {opts, []} = OptionParser.parse!(args, strict: options)
 
     opts
     |> Keyword.put_new_lazy(:module, &default_module/0)
     |> Keyword.update!(:module, &module_for_template!/1)
     |> Keyword.put_new_lazy(:path, &default_path/0)
-    |> Keyword.put_new_lazy(:app_namespace, &app_namespace/0)
+    |> Keyword.put_new_lazy(:app, &app_namespace/0)
   end
 
   defp default_path do

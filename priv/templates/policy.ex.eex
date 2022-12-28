@@ -1,9 +1,9 @@
 defmodule <%= module %> do
   @moduledoc """
-  Authorization for <%= app_namespace %> resources.
+  Authorization policy and helpers for <%= app %> resources.
   """
   use Janus
-  alias <%= app_namespace %>.Repo
+  alias <%= app %>.Repo
 
   @impl true
   def policy_for(policy, _user) do
@@ -12,73 +12,149 @@ defmodule <%= module %> do
   end
 
   @doc """
-  Load and authorize a resource.
-
-  Returns `{:ok, resource}` if the actor is authorized, otherwise
-  `{:error, :not_authorized}`.
-
-  ## Examples
-
-      iex> load_and_authorize(MyResource, :read, user, id: resource_id)
-      {:ok, %MyResource{...}}
-
-      iex> load_and_authorize(Restricted, :read, user, id: resource_id)
-      {:error, :not_authorized}
-
-      iex> load_and_authorize(MyResource, :read, user, other_unique_key: key)
-      {:ok, %MyResource{...}}
+  TODO
   """
-  def load_and_authorize(schema, action, actor, clauses)
-      when is_atom(schema) and is_list(clauses) do
-    schema
-    |> Repo.get_by(clauses)
-    |> authorize(action, actor)
-  end
+  def authorized_fetch_by(queryable, clauses, opts \\ []) do
+    {auth, auth_opts, repo_opts} = pop_authorize_opts!(opts, [:load_associations])
+    resource = Repo.get_by(queryable, clauses, repo_opts)
 
-  @doc """
-  Loads authorized resources.
-
-  Returns `{:ok, resources}` if the actor has access to any resources from `schema`,
-  otherwise `{:error, :not_authorized}`.
-
-  Note that `{:ok, []}` only means that the query returned no results, not that the actor
-  was unauthorized.
-
-  ## Examples
-
-      iex> load_authorized(MyResource, :read, user)
-      {:ok, [%MyResource{...}, ...]}
-
-      iex> load_authorized(Restricted, :read, user)
-      {:error, :not_authorized}
-
-      iex> MyResource
-      ...> order_by(desc: :inserted_at)
-      ...> load_authorized(MyResource, :read, user)
-      {:ok, [%MyResource{...}, ...]}
-  """
-  def load_authorized(query_or_schema, action, actor, opts \\ []) do
-    policy = policy_for(actor)
-
-    if any_authorized?(query_or_schema, action, policy) do
-      {:ok, scope(query_or_schema, action, policy, opts) |> Repo.all()}
-    else
-      {:error, :not_authorized}
+    case {resource, auth} do
+      {nil, _} -> {:error, :not_found}
+      {resource, {action, actor}} -> authorize(resource, action, actor, auth_opts)
+      {resource, false} -> {:ok, resource}
     end
   end
 
   @doc """
-  Validates that the resource being changed is authorized both before and after applying
-  changes.
+  TODO
+  """
+  def authorized_fetch_all(queryable, opts \\ []) do
+    {auth, auth_opts, repo_opts} = pop_authorize_opts!(opts, [:preload_authorized])
+
+    with {:auth, {action, actor}} <- {:auth, auth},
+         {:any?, true} <- {:any?, any_authorized?(queryable, action, actor)} do
+      {:ok, queryable |> scope(action, actor, auth_opts) |> Repo.all(repo_opts)}
+    else
+      {:auth, false} -> {:ok, Repo.all(queryable, repo_opts)}
+      {:any?, false} -> {:error, :not_authorized}
+    end
+  end
+
+  @doc """
+  TODO
+  """
+  def authorized_delete(struct_or_changeset, opts \\ [])
+
+  def authorized_delete(%Ecto.Changeset{} = changeset, opts) do
+    {auth, [], repo_opts} = pop_authorize_opts!(opts)
+
+    case auth do
+      {action, policy} ->
+        changeset
+        |> validate_authorized(action, policy,
+          message: "is not authorized to delete this resource"
+        )
+        |> Repo.delete(repo_opts)
+
+      false ->
+        Repo.delete(changeset, repo_opts)
+    end
+  end
+
+  def authorized_delete(struct, opts) do
+    authorized_delete(Ecto.Changeset.change(struct), opts)
+  end
+
+  @doc """
+  TODO
+  """
+  def authorized_update(changeset, opts \\ []) do
+    {auth, [], repo_opts} = pop_authorize_opts!(opts)
+
+    case auth do
+      {action, policy} ->
+        changeset
+        |> validate_authorized(action, policy)
+        |> rollback_unless_authorized(:update, repo_opts, {action, policy})
+
+      false ->
+        Repo.update(changeset, repo_opts)
+    end
+
+  end
+
+  @doc """
+  TODO
+  """
+  def authorized_insert(changeset, opts \\ []) do
+    {auth, [], repo_opts} = pop_authorize_opts!(opts)
+
+    case auth do
+      {action, policy} ->
+        rollback_unless_authorized(changeset, :insert, repo_opts, {action, policy})
+
+      false ->
+        Repo.insert(changeset, repo_opts)
+    end
+  end
+
+  defp rollback_unless_authorized(changeset, op, opts, {action, policy}) do
+    Repo.transaction(fn ->
+      with {:ok, resource} <- apply(Repo, op, [changeset, opts]),
+           {:ok, resource} <- authorize(resource, action, policy) do
+        resource
+      else
+        {:error, %Ecto.Changeset{} = changeset} ->
+          Repo.rollback(changeset)
+
+        {:error, :not_authorized} ->
+          changeset
+          |> Ecto.Changeset.add_error(
+            :current_user,
+            "is not authorized to make these changes"
+          )
+          |> Repo.rollback()
+      end
+    end)
+  end
+
+  defp pop_authorize_opts!(opts, extra_keys \\ []) do
+    case Keyword.pop(opts, :authorize) do
+      {{action, actor}, rest} ->
+        {extra, rest} = Keyword.split(rest, extra_keys)
+        {{action, policy_for(actor)}, extra, rest}
+
+      {false, rest} ->
+        {_, rest} = Keyword.split(rest, extra_keys)
+        {false, [], rest}
+
+      {nil, _} ->
+        raise ArgumentError, "required option `:authorize` missing from `#{inspect(opts)}`"
+    end
+  end
+
+  @doc """
+  Validates that the resource being changes is authorized for the given action/user.
+
+    test "validate_authorized/4 should accept custom :post_message", %{
+      module: module,
+      policy: policy,
+      thread: thread
+    } do
+      denied =
+        thread
+        |> Thread.changeset(%{archived: true})
+        |> module.validate_authorized(:update, policy, post_message: "custom message")
+
+      assert [current_user: {"custom message", _}] = denied.errors
+    end
 
   ## Options
 
+    * `:message` - the message in case the authorization check fails on the resource,
+      defaults to "is not authorized to change this resource"
     * `:error_key` - the key to which the error will be added if authorization fails,
       defaults to `:current_user`
-    * `:pre_message` - the message in case the authorization check fails on the resource
-      prior to applying changes, defaults to "is not authorized to change this resource"
-    * `:post_message` - the message in case the authorization check fails on the resource
-      after applying changes, defaults to "is not authorized to make these changes"
 
   ## Examples
 
@@ -90,23 +166,17 @@ defmodule <%= module %> do
   def validate_authorized(%Ecto.Changeset{} = changeset, action, actor_or_policy, opts \\ []) do
     policy = policy_for(actor_or_policy)
 
-    opts =
-      Keyword.validate!(opts,
-        error_key: :current_user,
-        pre_message: "is not authorized to change this resource",
-        post_message: "is not authorized to make these changes"
+    %{message: message, error_key: key} =
+      opts
+      |> Keyword.validate!(
+        message: "is not authorized to change this resource",
+        error_key: :current_user
       )
+      |> Map.new()
 
-    with {:pre, {:ok, data}} <- {:pre, authorize(changeset.data, action, policy)},
-         new_data <- Ecto.Changeset.apply_changes(changeset),
-         {:post, {:ok, _data}} <- {:post, authorize(new_data, action, policy)} do
-      %{changeset | data: data}
-    else
-      {:pre, {:error, :not_authorized}} ->
-        Ecto.Changeset.add_error(changeset, opts[:error_key], opts[:pre_message], policy: policy)
-
-      {:post, {:error, :not_authorized}} ->
-        Ecto.Changeset.add_error(changeset, opts[:error_key], opts[:post_message], policy: policy)
+    case authorize(changeset.data, action, policy) do
+      {:ok, _} -> changeset
+      {:error, :not_authorized} -> Ecto.Changeset.add_error(changeset, key, message)
     end
   end
 end

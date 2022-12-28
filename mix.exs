@@ -97,7 +97,8 @@ defmodule Janus.MixProject do
       extras: [
         "README.md",
         "CHANGELOG.md",
-        "guides/cheatsheet.cheatmd"
+        "guides/cheatsheet.cheatmd",
+        "guides/generated_policy.md"
       ]
     ]
   end

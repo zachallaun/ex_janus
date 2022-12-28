@@ -12,7 +12,7 @@ defmodule JanusTest.Schemas.Thread do
     timestamps()
 
     belongs_to :creator, User
-    has_many :posts, Post
+    has_many :posts, Post, on_delete: :delete_all
   end
 
   def changeset(post, attrs) do

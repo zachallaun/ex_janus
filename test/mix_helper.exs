@@ -33,45 +33,45 @@ defmodule MixHelper do
     Path.expand("../tmp", __DIR__)
   end
 
-  defp random_string(len) do
-    len |> :crypto.strong_rand_bytes() |> Base.encode64() |> binary_part(0, len)
-  end
-
-  def in_tmp(which, function) do
-    path = Path.join([tmp_path(), random_string(10), to_string(which)])
-
-    try do
-      File.rm_rf!(path)
-      File.mkdir_p!(path)
-      File.cd!(path, function)
-    after
-      File.rm_rf!(path)
-    end
-  end
-
-  def in_tmp_project(which, function) do
+  def in_tmp_project(name, function) do
     random_root = Path.join([tmp_path(), random_string(10)])
-    path = Path.join([random_root, to_string(which)])
 
     try do
-      File.rm_rf!(path)
-      File.mkdir_p!(path)
-
-      File.cd!(path, fn ->
-        File.touch!("mix.exs")
-
-        File.write!(".formatter.exs", """
-        [
-          import_deps: [:ecto, :ecto_sql, :ex_janus],
-          inputs: ["*.exs"]
-        ]
-        """)
-
-        function.()
-      end)
+      in_project(random_root, name, function)
     after
       File.rm_rf!(random_root)
     end
+  end
+
+  def in_project(name, function) do
+    random_root = Path.join([tmp_path(), random_string(10)])
+    in_project(random_root, name, function)
+  end
+
+  def in_project(root, name, function) do
+    path = Path.join([root, to_string(name)])
+
+    File.rm_rf!(path)
+    File.mkdir_p!(path)
+
+    File.cd!(path, fn ->
+      File.touch!("mix.exs")
+
+      File.write!(".formatter.exs", """
+      [
+        import_deps: [:ecto, :ecto_sql, :ex_janus],
+        inputs: ["*.exs"]
+      ]
+      """)
+
+      function.()
+    end)
+
+    root
+  end
+
+  defp random_string(len) do
+    len |> :crypto.strong_rand_bytes() |> Base.encode64() |> binary_part(0, len)
   end
 
   def assert_file(file) do
@@ -96,14 +96,6 @@ defmodule MixHelper do
 
       true ->
         raise inspect({file, match})
-    end
-  end
-
-  def flush do
-    receive do
-      _ -> flush()
-    after
-      0 -> :ok
     end
   end
 end
