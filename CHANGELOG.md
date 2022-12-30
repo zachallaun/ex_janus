@@ -6,8 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- Configuration for some options when invoking `use Janus`.
-- Support loading associations when required by authorization rules in `Janus.Authorization.authorize/4`.
+- Overhaul generated policy helpers (mix janus.gen.policy) to more easily replace `Ecto.Repo` callbacks.
+- Required association loading:
+  - `Janus.Authorization.authorize/4` adds `:repo` and `:load_associations` option.
+  - `use Janus` accepts options to override defaults.
 
 ### Changed
 
@@ -21,4 +23,4 @@ This marks the first release of Janus.
 ### Added
 
 - `Janus.Policy` and `Janus.Authorization` (behaviours) drive the definition and usage of authorization policies.
-- [mix janus.gen.policy] Mix task for generating basic policy and helpers.
+- Mix task for generating basic policy and helpers.
