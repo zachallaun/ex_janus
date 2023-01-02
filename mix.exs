@@ -99,6 +99,15 @@ defmodule Janus.MixProject do
         "CHANGELOG.md",
         "guides/cheatsheet.cheatmd",
         "guides/generated_policy.md"
+      ],
+      groups_for_extras: [
+        Guides: [
+          "guides/cheatsheet.cheatmd",
+          "guides/generated_policy.md"
+        ]
+      ],
+      groups_for_modules: [
+        Internal: [Janus.Policy.Rule]
       ]
     ]
   end

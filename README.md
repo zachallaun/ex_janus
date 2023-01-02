@@ -1,12 +1,12 @@
-# Janus
+[![Hex.pm](https://img.shields.io/hexpm/v/ex_janus.svg)](https://hex.pm/packages/ex_janus) [![Docs](https://img.shields.io/badge/hexdocs.pm-docs-8e7ce6.svg)](https://hexdocs.pm/ex_janus)
 
 Authorization superpowers for your `Ecto` schemas.
 
 Janus prioritizes:
 
 * Single source of truth: authorization rules should be defined once and used for authorizing individual actions as well as composing Ecto queries.
-* Minimal library footprint: favor a small set of powerful that applications can use to expose their own optimal authorization API.
-* Minimal application footprint: where possible, "hide" Janus behind user-controlled policy modules that implement well-defined behaviours.
+* Minimal library footprint: expose a small set of useful functions that application authors can use to set up their own optimal authorization API.
+* Minimal application footprint: "hide" Janus behind application- controlled policy modules that define the interface for the rest of the application.
 * Escape hatches: easily "drop down" to your own code when the declarative API doesn't cut it.
 
 [**Documentation**](https://hexdocs.pm/ex_janus/Janus.html)

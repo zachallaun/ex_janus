@@ -1,4 +1,4 @@
-# Policy module helpers
+# Generated Policy Modules
 
 **This guide is a work in progress.**
 
