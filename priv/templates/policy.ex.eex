@@ -62,7 +62,9 @@ defmodule <%= module %> do
         authorize: false
       )
   """
+
   use Janus, repo: <%= app %>.Repo
+
   alias <%= app %>.Repo
 
   @impl true

@@ -3,12 +3,7 @@ defmodule Janus.Policy.Rule do
   Defines a rule for an individual schema and action.
   """
 
-  @type t :: %__MODULE__{
-          schema: Janus.schema_module(),
-          action: Janus.action(),
-          allow: [keyword() | boolean()],
-          deny: [keyword() | boolean()]
-        }
+  @valid_clauses [:where, :where_not, :or_where]
 
   defstruct [
     :schema,
@@ -17,7 +12,12 @@ defmodule Janus.Policy.Rule do
     deny: []
   ]
 
-  @valid_options [:where, :where_not, :or_where]
+  @type t :: %__MODULE__{
+          schema: Janus.schema_module(),
+          action: Janus.action(),
+          allow: [keyword() | boolean()],
+          deny: [keyword() | boolean()]
+        }
 
   @doc false
   def new(schema, action) do
@@ -46,7 +46,7 @@ defmodule Janus.Policy.Rule do
 
   defp parse_opts!(opts) do
     with true <- Keyword.keyword?(opts),
-         [] <- opts |> Keyword.keys() |> Enum.uniq() |> Kernel.--(@valid_options) do
+         [] <- opts |> Keyword.keys() |> Enum.uniq() |> Kernel.--(@valid_clauses) do
       combine(opts)
     else
       opts when is_list(opts) -> invalid_opts!(opts)

@@ -148,6 +148,16 @@ defmodule Janus.Policy do
   alias __MODULE__
   alias __MODULE__.Rule
 
+  @hooks :__janus_hooks__
+  @config :__janus_policy_config__
+
+  @config_defaults [
+    repo: nil,
+    load_associations: false
+  ]
+
+  defstruct [:module, config: %{}, rules: %{}]
+
   @type t :: %Policy{
           module: module(),
           config: map(),
@@ -156,22 +166,12 @@ defmodule Janus.Policy do
           }
         }
 
-  defstruct [:module, config: %{}, rules: %{}]
-
   @doc """
   Returns the policy for the given actor.
 
   This is the only callback that is required in a policy module.
   """
   @callback policy_for(t, Janus.actor()) :: t
-
-  @hooks :__janus_hooks__
-  @config :__janus_policy_config__
-
-  @config_defaults [
-    repo: nil,
-    load_associations: false
-  ]
 
   @doc false
   defmacro __using__(opts \\ []) do

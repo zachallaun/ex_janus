@@ -2,9 +2,12 @@ defmodule Janus.Authorization.Filter do
   @moduledoc false
 
   import Ecto.Query
+
   alias __MODULE__
 
   @root_binding :__object__
+
+  defstruct [:policy, :action, :schema, :binding, :parent_binding, :dynamic, joins: []]
 
   @type t :: %Filter{
           policy: Janus.Policy.t(),
@@ -15,8 +18,6 @@ defmodule Janus.Authorization.Filter do
           dynamic: Ecto.Query.dynamic(),
           joins: keyword()
         }
-
-  defstruct [:policy, :action, :schema, :binding, :parent_binding, :dynamic, joins: []]
 
   @doc """
   Converts a `%Filter{}` struct into an `%Ecto.Query{}`
