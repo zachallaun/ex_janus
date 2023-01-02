@@ -50,7 +50,7 @@ defmodule Janus.AuthorizationTest do
       refute Auth.any_authorized?(Thread, :read, policy)
     end
 
-    test "should return true if a deny is conditional on attribute match" do
+    test "should return true if a deny is conditional on an unmatched attribute" do
       policy =
         %Janus.Policy{}
         |> allow(:read, Thread)
