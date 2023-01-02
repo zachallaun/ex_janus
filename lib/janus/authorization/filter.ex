@@ -24,8 +24,8 @@ defmodule Janus.Authorization.Filter do
   ## Options
 
   * `:query` - initial query to build off of (defaults to `filter.struct`)
-  * `:preload_authorized` - preload associated resources, filtering them using the same
-    policy and action present on the filter
+  * `:preload_authorized` - preload associated resources, filtering them
+    using the same policy and action present on the filter
   """
   def to_query(%Filter{} = filter, opts \\ []) do
     %{
@@ -44,8 +44,6 @@ defmodule Janus.Authorization.Filter do
 
   @doc """
   Filters a query using action and policy.
-
-  Note that opts must have been processed using `prep_opts/1` at macro time.
   """
   def filter(query_or_schema, action, policy, opts \\ []) do
     {query, schema} = Janus.Utils.resolve_query_and_schema!(query_or_schema)

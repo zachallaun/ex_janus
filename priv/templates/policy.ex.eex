@@ -2,52 +2,61 @@ defmodule <%= module %> do
   @moduledoc """
   Authorization policy and helpers for <%= app %> resources.
 
-  This module exposes a set of general-purpose authorization helpers as well as
-  `Ecto.Repo` wrappers that can be used to enforce authorization when data is loaded,
-  inserted, updated, etc.
+  This module exposes a set of general-purpose authorization helpers as
+  well as `Ecto.Repo` wrappers that can be used to enforce authorization
+  when data is loaded, inserted, updated, etc.
 
   ## Policy structs
 
-  All of the functions in this module can accept either a policy struct or a user, in
-  which case a policy struct will be created for that user under the hood. If it is
-  desired to cache the policy struct to re-use it for multiple calls, for instance in a
-  `Plug.Conn` assign, `policy_for/1` can be used:
+  All of the functions in this module can accept either a policy struct
+  or a user, in which case a policy struct will be created for that user
+  under the hood. If it is desired to cache the policy struct to re-use
+  it for multiple calls, for instance in a `Plug.Conn` assign,
+  `policy_for/1` can be used:
 
       iex> <%= module %>.policy_for(user)
       %Janus.Policy{}
 
-  In the examples that follow, a policy can take the place of a user anywhere one is
-  passed as an argument.
+  In the examples that follow, a policy can take the place of a user
+  anywhere one is passed as an argument.
 
   ## Authorization helpers
 
   The following functions can be used to authorize actions on resources:
 
-    * `authorize(%Schema{}, action, user, opts)` - authorize a specific action on an
-      already-loaded resource
-    * `any_authorized?(queryable, action, user)` - check whether the user has any access
-      to resources in the given query or schema
-    * `scope(queryable, action, user, opts)` - produce an `Ecto.Query` that filters
-      results to those authorized for the given action/user
+    * `authorize/4` - authorize a specific action on an already-loaded
+      resource
+    * `any_authorized?/3` - check whether the user has any access to
+      resources in the given query or schema
+    * `scope/4` - produce an `Ecto.Query` that filters results to those
+      authorized for the given action/user
 
   See `Janus.Authorization` for more documentation on the above.
 
   ## Authorized Repo operations
 
-  This module additionally defines various `authorized_*` functions that provide
-  authorizing alternatives to `Repo` functions. For instance, `<%= module %>.authorized_update/2`
-  can be used in place of `Repo.update/2` to ensure that the given user is authorized to
-  make that update.
+  This module additionally defines various `authorized_*` functions that
+  provide authorizing alternatives to `Repo` functions. They include:
 
-  All of these functions accept accept an `:authorize` option containing an
-  `{action, user}` or `{action, policy}` tuplet. For example:
+    * `authorized_fetch_by/3`
+    * `authorized_fetch_all/2`
+    * `authorized_insert/2`
+    * `authorized_update/2`
+    * `authorized_delete/2`
+
+  For instance, `Chronos.Policy.authorized_update/2` can be used in
+  place of `Repo.update/2` to ensure that the given user is authorized
+  to make that update.
+
+  All of these functions accept accept an `:authorize` option containing
+  an `{action, user}` or `{action, policy}` tuplet. For example:
 
       <%= module %>.authorized_fetch_by(Post, [id: id],
         authorize: {:read, current_user}
       )
 
-  To skip authorization checks, `authorize: false` can be passed in. For example, the
-  following would never return `{:error, :not_authorized}`:
+  To skip authorization checks, `authorize: false` can be passed in. For
+  example, the following would never return `{:error, :not_authorized}`:
 
       <%= module %>.authorized_fetch_by(Post, [id: id],
         authorize: false
@@ -68,15 +77,17 @@ defmodule <%= module %> do
   Results in:
 
     * `{:ok, result}` if the result is found and authorized
-    * `{:error, :not_authorized}` if the result is found and not authorized
+    * `{:error, :not_authorized}` if the result is found and not
+      authorized
     * `{:error, :not_found}` if the result is not found
     * Raises if more than one entry
 
   ## Options
 
-    * `:authorize` - The `{action, user}` tuplet or `false` to skip authorization, see
-      "Authorized Repo operations" for more
-    * `:load_associations` - Whether to load associations if necessary for authorization
+    * `:authorize` - The `{action, user}` tuplet or `false` to skip
+      authorization, see "Authorized Repo operations" for more
+    * `:load_associations` - Whether to load associations if necessary
+      for authorization
     * Any option accepted by `c:Ecto.Repo.get_by/3`
 
   ## Examples
@@ -119,10 +130,10 @@ defmodule <%= module %> do
 
   ## Options
 
-    * `:authorize` - The `{action, user}` tuplet or `false` to skip authorization, see
-      "Authorized Repo operations" for more
-    * `:preload_authorized` - preload authorized entries into associations, see
-      `Janus.Authorization.scope/4` for more
+    * `:authorize` - The `{action, user}` tuplet or `false` to skip
+      authorization, see "Authorized Repo operations" for more
+    * `:preload_authorized` - preload authorized entries into
+      associations, see `Janus.Authorization.scope/4` for more
     * Any option accepted by `c:Ecto.Repo.all/2`
 
   ## Examples
@@ -164,18 +175,19 @@ defmodule <%= module %> do
   end
 
   @doc """
-  Deletes a struct (or changeset) using its primary key if the operation is authorized.
+  Deletes a struct (or changeset) using its primary key if the operation
+  is authorized.
 
   Results in:
 
     * `{:ok, record}` if the authorized delete succeeded
-    * `{:error, changeset}` if the delete failed either due to an authorization error
-      or another validation
+    * `{:error, changeset}` if the delete failed either due to an
+      authorization error or another validation
 
   ## Options
 
-    * `:authorize` - The `{action, user}` tuplet or `false` to skip authorization, see
-      "Authorized Repo operations" for more
+    * `:authorize` - The `{action, user}` tuplet or `false` to skip
+      authorization, see "Authorized Repo operations" for more
     * Any option accepted by `c:Ecto.Repo.delete/2`
 
   ## Examples
@@ -214,18 +226,19 @@ defmodule <%= module %> do
   end
 
   @doc """
-  Updates a changeset using its primary key if the operation is authorized.
+  Updates a changeset using its primary key if the operation is
+  authorized.
 
   Results in:
 
     * `{:ok, record}` if the underlying data was successfully updated
-    * `{:error, changeset}` if the update failed either due to an authorization error
-      or another validation
+    * `{:error, changeset}` if the update failed either due to an
+      authorization error or another validation
 
   ## Options
 
-    * `:authorize` - The `{action, user}` tuplet or `false` to skip authorization, see
-      "Authorized Repo operations" for more
+    * `:authorize` - The `{action, user}` tuplet or `false` to skip
+      authorization, see "Authorized Repo operations" for more
     * Any option accepted by `c:Ecto.Repo.update/2`
 
   ## Examples
@@ -257,19 +270,19 @@ defmodule <%= module %> do
   end
 
   @doc """
-  Inserts a struct defined via `Ecto.Schema` or a changeset, ensuring the resulting
-  struct is authorized.
+  Inserts a struct defined via `Ecto.Schema` or a changeset, ensuring
+  the resulting struct is authorized.
 
   Results in:
 
     * `{:ok, record}` if the data was successfully inserted
-    * `{:error, changeset}` if the insert failed either due to an authorization error
-      or another validation
+    * `{:error, changeset}` if the insert failed either due to an
+      authorization error or another validation
 
   ## Options
 
-    * `:authorize` - The `{action, user}` tuplet or `false` to skip authorization, see
-      "Authorized Repo operations" for more
+    * `:authorize` - The `{action, user}` tuplet or `false` to skip
+      authorization, see "Authorized Repo operations" for more
     * Any option accepted by `c:Ecto.Repo.insert/2`
 
   ## Examples
@@ -339,27 +352,15 @@ defmodule <%= module %> do
   end
 
   @doc """
-  Validates that the resource being changes is authorized for the given action/user.
-
-    test "validate_authorized/4 should accept custom :post_message", %{
-      module: module,
-      policy: policy,
-      thread: thread
-    } do
-      denied =
-        thread
-        |> Thread.changeset(%{archived: true})
-        |> module.validate_authorized(:update, policy, post_message: "custom message")
-
-      assert [current_user: {"custom message", _}] = denied.errors
-    end
+  Validates that the resource being changes is authorized for the given
+  action/user.
 
   ## Options
 
-    * `:message` - the message in case the authorization check fails on the resource,
-      defaults to "is not authorized to change this resource"
-    * `:error_key` - the key to which the error will be added if authorization fails,
-      defaults to `:current_user`
+    * `:message` - the message in case the authorization check fails on
+      the resource, defaults to "is not authorized to change this resource"
+    * `:error_key` - the key to which the error will be added if
+      authorization fails, defaults to `:current_user`
 
   ## Examples
 

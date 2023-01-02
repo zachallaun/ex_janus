@@ -4,32 +4,36 @@ defmodule Janus do
 
   Janus prioritizes:
 
-    * Single source of truth: authorization rules should be defined once and used for
-      authorizing individual actions as well as composing Ecto queries.
-    * Minimal library footprint: favor a small set of powerful that applications can use
-      to expose their own optimal authorization API.
-    * Minimal application footprint: where possible, "hide" Janus behind user-controlled
-      policy modules that implement well-defined behaviours.
-    * Escape hatches: easily "drop down" to your own code when the declarative API doesn't
-      cut it.
+    * Single source of truth: authorization rules should be defined once
+      and used for authorizing individual actions as well as composing
+      Ecto queries.
+    * Minimal library footprint: favor a small set of powerful that
+      applications can use to expose their own optimal authorization API.
+    * Minimal application footprint: where possible, "hide" Janus behind
+      user-controlled policy modules that implement well-defined
+      behaviours.
+    * Escape hatches: easily "drop down" to your own code when the
+      declarative API doesn't cut it.
 
   Janus is split into two primary components:
 
-    * `Janus.Policy` - functions and behaviour for defining _policy modules_, which
-      describe the allowed actors, actions, and resources in your application. This is
-      where you look if you're writing a policy module.
-    * `Janus.Authorization` - functions and behaviour used by the rest of your
-      application to authorize and load resources. This is where you look if you're using
-      a policy module.
+    * `Janus.Policy` - functions and behaviour for defining _policy
+    modules_, which describe the allowed actors, actions, and resources
+    in your application. This is where you look if you're writing a
+    policy module.
+    * `Janus.Authorization` - functions and behaviour used by the rest
+    of your application to authorize and load resources. This is where
+    you look if you're using a policy module.
 
-  Janus defines a Mix task to generate the basic policy module that will get you started:
+  Janus defines a Mix task to generate the basic policy module that will
+  get you started:
 
       $ mix janus.gen.policy
 
   ## Policies
 
-  Policy modules are created by invoking `use Janus`, which implements both the
-  `Janus.Policy` and `Janus.Authorization` behaviours:
+  Policy modules are created by invoking `use Janus`, which implements
+  both the `Janus.Policy` and `Janus.Authorization` behaviours:
 
       defmodule Policy do
         use Janus
@@ -40,13 +44,15 @@ defmodule Janus do
         end
       end
 
-  When you invoke `use Janus`, default implementations are injected for required
-  callbacks, except for `c:Janus.Policy.policy_for/2`. This callback is your foundation,
-  as it returns the authorization policy for an individual user of your application.
+  When you invoke `use Janus`, default implementations are injected for
+  required callbacks, except for `c:Janus.Policy.policy_for/2`. This
+  callback is your foundation, as it returns the authorization policy
+  for an individual user of your application.
 
-  The policy above is not very useful -- it doesn't allow anyone to do anything -- but
-  that can be changed by using the `Janus.Policy` API to define actions, resources, and
-  conditions that make up your authorization rules.
+  The policy above is not very useful -- it doesn't allow anyone to do
+  anything -- but that can be changed by using the `Janus.Policy` API to
+  define actions, resources, and conditions that make up your
+  authorization rules.
 
       def policy_for(policy, %User{role: :moderator} = mod) do
         policy
@@ -60,7 +66,8 @@ defmodule Janus do
 
   ## Authorization
 
-  With our policy module defined, it can now be used to load and authorize resources.
+  With our policy module defined, it can now be used to load and
+  authorize resources.
 
       iex> Policy.authorize(some_post, :archive, moderator)
       {:ok, some_post}
@@ -80,18 +87,20 @@ defmodule Janus do
       iex> Policy.any_authorized?(Post, :delete, moderator)
       false # there are no rules that allow moderators to delete posts
 
-  These functions make up the `Janus.Authorization` behaviour, and their definitions
-  were injected by default when we invoked `use Janus`. This is the "public API" that the
-  rest of your application will use to authorize resources.
+  These functions make up the `Janus.Authorization` behaviour, and their
+  definitions were injected by default when we invoked `use Janus`. This
+  is the "public API" that the rest of your application will use to
+  authorize resources.
 
   See the `Janus.Authorization` documentation for more.
 
   ## Integration with `Ecto.Query`
 
-  The primary assumption that Janus makes is that your resources are backed by an
-  `Ecto.Schema`. Using Ecto's schema reflection capabilities, Janus is able to use the
-  same policy to authorize a single resource and to construct a composable Ecto query
-  that is aware of field types and associations.
+  The primary assumption that Janus makes is that your resources are
+  backed by an `Ecto.Schema`. Using Ecto's schema reflection
+  capabilities, Janus is able to use the same policy to authorize a
+  single resource and to construct a composable Ecto query that is aware
+  of field types and associations.
 
       # This query would result in the 5 latest posts that the current
       # user is authorized to see, preloaded with the user # who made
@@ -109,14 +118,14 @@ defmodule Janus do
 
   ## Configuration
 
-  Some defaults can be configured by passing them as options when invoking `use Janus`.
-  Those are:
+  Some defaults can be configured by passing them as options when
+  invoking `use Janus`. Those are:
 
-    * `:repo` - `Ecto.Repo` used to load associations when required by your authorization
-      rules
-    * `:load_associations` - Load associations when required by your authorization rules
-      (requires `:repo` config option to be set or to be passed explicitly at the call
-      site), defaults to `false`
+    * `:repo` - `Ecto.Repo` used to load associations when required by
+      your authorization rules
+    * `:load_associations` - Load associations when required by your
+      authorization rules (requires `:repo` config option to be set or
+      to be passed explicitly at the call site), defaults to `false`
 
   For example:
 
@@ -128,8 +137,8 @@ defmodule Janus do
           # ...
       end
 
-  These defaults will be referenced in the `Janus.Authorization` documentation where they
-  are used.
+  These defaults will be referenced in the `Janus.Authorization`
+  documentation where they are used.
   """
 
   require Ecto.Query
@@ -139,16 +148,23 @@ defmodule Janus do
   @type actor :: any()
 
   @doc """
-  Sets up a module to implement the `Janus.Policy` and `Janus.Authorization` behaviours.
+  Sets up a module to implement the `Janus.Policy` and
+  `Janus.Authorization` behaviours.
 
   Invoking `use Janus` does the following:
 
-    * invokes `use Janus.Policy` which imports functions for defining policies and
-      injects wrapper definitions for `policy_for/1` and `policy_for/2` that support
-      hooks (see `Janus.Policy` for more)
+    * invokes `use Janus.Policy` which imports functions for defining
+      policies and injects wrapper definitions for `policy_for/1` and
+      `policy_for/2` that support hooks (see `Janus.Policy` for more)
     * injects implementations for the `Janus.Authorization` behaviour
 
   ## Options
+
+    * `:load_associations` - Load associations when required by your
+      authorization rules (requires `:repo` config option to be set or
+      to be passed explicitly at the call site), defaults to `false`
+    * `:repo` - `Ecto.Repo` used to load associations when required by
+      your authorization rules
 
   See "Configuration" section for details.
 

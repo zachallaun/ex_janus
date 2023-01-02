@@ -4,9 +4,11 @@ defmodule Janus.Utils do
   @doc """
   Resolves a query or a schema to a `{query, schema}` pair.
 
-  If an `%Ecto.Query{}` is passed, the schema will be resolved from its `:from` field.
+  If an `%Ecto.Query{}` is passed, the schema will be resolved from its
+  `:from` field.
 
-  If a schema is passed, the query will be resolved using `Ecto.Queryable.to_query/1`.
+  If a schema is passed, the query will be resolved using
+  `Ecto.Queryable.to_query/1`.
   """
   def resolve_query_and_schema!(%Ecto.Query{} = query) do
     {query, resolve_schema!(query)}

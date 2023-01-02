@@ -2,18 +2,19 @@ defmodule Janus.Authorization do
   @moduledoc """
   Authorize and load resources using policies.
 
-  Policy modules expose a minimal API that can be used to authorize and load resources
-  throughout the rest of your application.
+  Policy modules expose a minimal API that can be used to authorize and
+  load resources throughout the rest of your application.
 
     * `authorize/4` - authorize an individual, already-loaded resource
-    * `scope/4` - construct an `Ecto` query for a schema that will filter
-      results to only those that are authorized
-    * `any_authorized?/3` - checks whether the given actor/policy has _any_ access to
-      the given schema for the given action
+    * `scope/4` - construct an `Ecto` query for a schema that will
+      filter results to only those that are authorized
+    * `any_authorized?/3` - checks whether the given actor/policy has
+      _any_ access to the given schema for the given action
 
-  These functions will usually be called from your policy module directly, since wrappers
-  that accept either a policy or an actor are injected when you invoke `use Janus`.
-  Documentation examples will show usage from your policy module.
+  These functions will usually be called from your policy module
+  directly, since wrappers that accept either a policy or an actor are
+  injected when you invoke `use Janus`.  Documentation examples will
+  show usage from your policy module.
 
   See individual function documentation for details.
   """
@@ -32,16 +33,18 @@ defmodule Janus.Authorization do
               Ecto.Query.t()
 
   @doc """
-  Checks whether any permissions are defined for the given schema, action, and actor.
+  Checks whether any permissions are defined for the given schema,
+  action, and actor.
 
-  This function is most useful in conjunction with `scope/4`, which builds
-  an `Ecto` query that filters to only those resources the actor is authorized for. If
-  you run the resulting query and receive `[]`, it is not possible to determine whether
-  the result is empty because the actor wasn't authorized for _any_ resources or because
-  of other restrictions on the query.
+  This function is most useful in conjunction with `scope/4`, which
+  builds an `Ecto` query that filters to only those resources the actor
+  is authorized for. If you run the resulting query and receive `[]`, it
+  is not possible to determine whether the result is empty because the
+  actor wasn't authorized for _any_ resources or because of other
+  restrictions on the query.
 
-  For example, you might use the following pattern to load all the resources a user is
-  allowed to read that were inserted in the last day:
+  For example, you might use the following pattern to load all the
+  resources a user is allowed to read that were inserted in the last day:
 
       query = from(r in MyResource, where: r.inserted_at > from_now(-1, "day"))
 
@@ -51,9 +54,10 @@ defmodule Janus.Authorization do
         {:error, :not_authorized}
       end
 
-  This would result in `{:ok, results}` if the user is authorized to read any resources,
-  even if the result set is empty, and would result in `{:error, :not_authorized}` if the
-  user isn't authorized to read the resources at all.
+  This would result in `{:ok, results}` if the user is authorized to
+  read any resources, even if the result set is empty, and would result
+  in `{:error, :not_authorized}` if the user isn't authorized to read
+  the resources at all.
 
   ## Examples
 
@@ -76,17 +80,18 @@ defmodule Janus.Authorization do
   @doc """
   Create an `%Ecto.Query{}` that results in only authorized records.
 
-  Like the `Ecto.Query` API, this function can accept a schema as the first argument or a
-  query, in which case it will compose with that query. If a query is passed, the
-  appropriate schema will be derived from that query's source.
+  Like the `Ecto.Query` API, this function can accept a schema as the
+  first argument or a query, in which case it will compose with that
+  query. If a query is passed, the appropriate schema will be derived
+  from that query's source.
 
       scope(MyResource, :read, user)
 
       query = from(r in MyResource, where: r.inserted_at > from_ago(1, "day"))
       scope(query, :read, user)
 
-  If the query specifies the source as a string, we cannot derive the schema. For
-  example, this will not work:
+  If the query specifies the source as a string, we cannot derive the
+  schema. For example, this will not work:
 
       # Raises an ArgumentError
       query = from(r in "my_resources", where: r.inserted_at > from_ago(1, "day"))
@@ -94,21 +99,24 @@ defmodule Janus.Authorization do
 
   ## Options
 
-    * `:preload_authorized` - Similar to `Ecto.Query.preload/3`, but only preloads those
-      associated records that are authorized. Note that this requires Ecto v3.9.4 or
-      later and a database that supports lateral joins. See "Preloading authorized
-      associations" for more information.
+    * `:preload_authorized` - Similar to `Ecto.Query.preload/3`, but
+    only preloads those associated records that are authorized. Note
+    that this requires Ecto v3.9.4 or later and a database that supports
+    lateral joins. See "Preloading authorized associations" for more
+    information.
 
   ## Preloading authorized associations
 
-  The `:preload_authorized` option can be used to preload associated records, but only
-  those that are authorized for the given actor. An additional query can be specified
-  for each preloaded association that will be run as if scoped to its parent row.
+  The `:preload_authorized` option can be used to preload associated
+  records, but only those that are authorized for the given actor. An
+  additional query can be specified for each preloaded association that
+  will be run as if scoped to its parent row.
 
-  This can simplify certain queries dramatically. For instance, imagine a user search
-  interface that lists users along with their most recent comment. Naughty comments can
-  be hidden by moderators, but those hidden comments should still be visible if a
-  moderator is searching. Here's how that might be accomplished:
+  This can simplify certain queries dramatically. For instance, imagine
+  a user search interface that lists users along with their most recent
+  comment. Naughty comments can be hidden by moderators, but those
+  hidden comments should still be visible if a moderator is searching.
+  Here's how that might be accomplished:
 
       iex> last_comment = from(Comment, order_by: [desc: :inserted_at], limit: 1)
 
@@ -122,28 +130,30 @@ defmodule Janus.Authorization do
 
   Some things to note about this example:
 
-    * The `last_comment` query runs as if scoped to each user's comments. This means that
-      the `:limit` applies to each user's comments, not the entire set of comments.
-    * The comment will be the last inserted comment that is authorized to be read by the
-      `current_user`. Moderators may be able to see hidden comments, while normal users
-      may not.
+    * The `last_comment` query runs as if scoped to each user's
+      comments. This means that the `:limit` applies to each user's
+      comments, not the entire set of comments.
+    * The comment will be the last inserted comment that is authorized
+      to be read by the `current_user`. Moderators may be able to see
+      hidden comments, while normal users may not.
 
-  It is also possible to nest authorized preloads. For instance, you could preload
-  comments and their associated post.
+  It is also possible to nest authorized preloads. For instance, you
+  could preload comments and their associated post.
 
       MyPolicy.scope(User, :read, current_user,
         preload_authorized: [comments: :post]
       )
 
-  This would load all comments. You could incorporate the `last_comment` query above by
-  specifying it as the first element of a tuple, followed by the list of inner preloads:
+  This would load all comments. You could incorporate the `last_comment`
+  query above by specifying it as the first element of a tuple, followed
+  by the list of inner preloads:
 
       MyPolicy.scope(User, :read, current_user,
         preload_authorized: [comments: {last_comment, [:post]}]
       )
 
-  This would load only the latest comment as well as its associated post (assuming it too
-  is authorized to be read by `current_user`).
+  This would load only the latest comment as well as its associated post
+  (assuming it too is authorized to be read by `current_user`).
 
   ## Examples
 
@@ -181,11 +191,12 @@ defmodule Janus.Authorization do
 
   ## Options
 
-    * `:load_associations` - Whether to load associations required by policy
-      authorization rules, defaults to `false` unless configured on your policy module
-    * `:repo` - Ecto repository to use when loading required associations if
-      `:load_associations` is set to `true`, defaults to `nil` unless configured on your
-      policy module
+    * `:load_associations` - Whether to load associations required by
+      policy authorization rules, defaults to `false` unless configured
+      on your policy module
+    * `:repo` - Ecto repository to use when loading required
+      associations if `:load_associations` is set to `true`, defaults to
+      `nil` unless configured on your policy module
 
   ## Examples
 
@@ -215,8 +226,9 @@ defmodule Janus.Authorization do
 
   # Conditions vs. Clauses
   #
-  # When creating a policy, every call to `allow`/`deny` creates a condition, and
-  # each `:where`, `:where_not`, etc. inside represents a clause in that condition.
+  # When creating a policy, every call to `allow`/`deny` creates a
+  # condition, and each `:where`, `:where_not`, etc. inside represents a
+  # clause in that condition.
   #
   # So if we consider the following:
   #
@@ -224,9 +236,10 @@ defmodule Janus.Authorization do
   #     |> allow(:read, Thing, where: [some_field: :foo], where_not: [other_field: :bar])
   #     |> allow(:read, Thing, where: [some_field: :baz])
   #
-  # This policy defines two conditions for reading Thing -- if one of them matches,
-  # it allows reading. For a condition to match, all of its clauses must match. The
-  # first `allow` has two clauses and the second has only one.
+  # This policy defines two conditions for reading Thing -- if one of
+  # them matches, it allows reading. For a condition to match, all of
+  # its clauses must match. The first `allow` has two clauses and the
+  # second has only one.
   #
   defp run_rule(%Policy.Rule{} = rule, attr, resource, policy) do
     conditions = Map.fetch!(rule, attr)
