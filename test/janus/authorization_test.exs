@@ -554,6 +554,9 @@ defmodule Janus.AuthorizationTest do
 
       assert_raise ArgumentError, message, fn ->
         Auth.scope("threads", :read, policy)
+      end
+
+      assert_raise ArgumentError, message, fn ->
         Auth.scope(from("threads"), :read, policy)
       end
     end

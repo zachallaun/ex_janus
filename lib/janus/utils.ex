@@ -23,12 +23,16 @@ defmodule Janus.Utils do
     {Ecto.Queryable.to_query(schema), schema}
   end
 
-  def resolve_query_and_schema!(query_or_schema) do
-    raise ArgumentError, "could not resolve query and schema from #{inspect(query_or_schema)}"
+  def resolve_query_and_schema!(other) do
+    raise ArgumentError, "could not resolve query and schema from #{inspect(other)}"
   end
 
   defp resolve_schema!(%Ecto.Query{from: from}), do: resolve_schema!(from.source)
   defp resolve_schema!(%Ecto.SubQuery{query: query}), do: resolve_schema!(query)
   defp resolve_schema!({_, schema}), do: resolve_schema!(schema)
   defp resolve_schema!(schema) when is_atom(schema) and not is_nil(schema), do: schema
+
+  defp resolve_schema!(other) do
+    raise ArgumentError, "could not resolve query and schema from #{inspect(other)}"
+  end
 end
