@@ -1,0 +1,158 @@
+# Policy Usage
+
+## Authorization
+{: .col-2}
+
+### Using policies in a context module
+
+Policies should most often be used in context modules, since they provide the interface to actions and resources that the rest of your application uses.
+
+```elixir
+defmodule MyApp.MessageBoard do
+  @moduledoc """
+  Context module for the message board.
+  """
+  import Ecto.Query
+
+  # imports authorize, any_authorized?, scope, etc.
+  import MyApp.Policy
+
+  alias MyApp.Repo
+
+  # ...
+end
+```
+
+### Authorizing an action using `authorize/4`
+
+```elixir
+def update_post(%Post{} = post, attrs \\ %{}, user_or_policy) do
+  case authorize(post, :edit, user_or_policy) do
+    {:ok, post} ->
+      post
+      |> Post.changeset(attrs)
+      |> Repo.update()
+
+    {:error, :not_authorized} ->
+      {:error, :not_authorized}
+  end
+end
+```
+
+```elixir
+iex> update_post(authorized_post, %{}, some_user)
+{:ok, %Post{}}
+
+iex> update_post(unauthorized_post, %{}, some_user)
+{:error, :not_authorized}
+```
+
+### Fetching authorized resources
+
+```elixir
+def authorized_posts(user_or_policy) do
+  if any_authorized?(Post, :read, user_or_policy) do
+    posts =
+      Post
+      |> scope(:read, user_or_policy)
+      |> Repo.all()
+
+    {:ok, posts}
+  else
+    {:error, :not_authorized}
+  end
+end
+```
+
+Use `any_authorized?/3` to differentiate between a result that is empty because there are no resources that match the policy conditions and a result that is empty because the user isn't authorized to view _any_ resources.
+
+### Preloading authorized associations
+
+```elixir
+scope(Post, :read, user_or_policy,
+  preload_authorized: :comments
+)
+```
+
+```elixir
+scope(Post, :read, user_or_policy,
+  preload_authorized: [comments: :user]
+)
+```
+
+The `:preload_authorized` option can be passed to preload only those associated resources that are authorized for the given action.
+
+### Applying a query to preloads
+
+```elixir
+latest_comment_query =
+  from Comment,
+    order_by: [desc: :inserted_at],
+    limit: 1
+
+scope(Post, :read, user_or_policy,
+  preload_authorized: [comments: latest_comment_query]
+)
+```
+
+A query can be applied to associated authorized resources.
+It is scoped per-association, so it applies to comments of _each_ post instead of the comments of _all_ posts.
+The above would return all `:read`-able posts preloaded with their latest `:read`-able comment.
+
+You can still include nested preloads using a tuple:
+
+```elixir
+scope(Post, :read, user_or_policy,
+  preload_authorized: [comments: {latest_comment_query, [:user]}]
+)
+```
+
+## Caching a policy
+{: .col-2}
+
+### Call `build_policy/1` to get the policy for a user
+
+```elixir
+iex> policy = MyApp.Policy.build_policy(current_user)
+%Janus.Policy{...}
+```
+
+### Pass a policy anywhere you'd pass in an actor
+
+```elixir
+iex> MyApp.Policy.authorize(post, :read, policy)
+{:ok, post}
+
+iex> MyApp.Policy.scope(Post, :read, policy)
+%Ecto.Query{}
+```
+
+### Cache a policy in a `Plug.Conn`
+
+#### Call in a plug
+
+```elixir
+def assign_current_policy(conn) do
+  %{assigns: %{current_user: user}} = conn
+
+  conn
+  |> assign(:current_policy, MyApp.Policy.build_policy(user))
+end
+```
+
+#### Controller action
+
+```elixir
+def index(conn, _params) do
+  %{assigns: %{current_policy: policy}} = conn
+
+  # Pass the policy to your context
+  case MessageBoard.authorized_posts(policy) do
+    {:ok, posts} ->
+      ...
+
+    {:error, :not_authorized} ->
+      ...
+  end
+end
+```

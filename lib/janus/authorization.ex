@@ -6,8 +6,10 @@ defmodule Janus.Authorization do
   load resources throughout the rest of your application.
 
     * `authorize/4` - authorize an individual, already-loaded resource
+
     * `scope/4` - construct an `Ecto` query for a schema that will
       filter results to only those that are authorized
+
     * `any_authorized?/3` - checks whether the given actor/policy has
       _any_ access to the given schema for the given action
 
@@ -133,6 +135,7 @@ defmodule Janus.Authorization do
     * The `last_comment` query runs as if scoped to each user's
       comments. This means that the `:limit` applies to each user's
       comments, not the entire set of comments.
+
     * The comment will be the last inserted comment that is authorized
       to be read by the `current_user`. Moderators may be able to see
       hidden comments, while normal users may not.
@@ -194,6 +197,7 @@ defmodule Janus.Authorization do
     * `:load_associations` - Whether to load associations required by
       policy authorization rules, defaults to `false` unless configured
       on your policy module
+
     * `:repo` - Ecto repository to use when loading required
       associations if `:load_associations` is set to `true`, defaults to
       `nil` unless configured on your policy module

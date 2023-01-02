@@ -92,18 +92,23 @@ defmodule Janus.MixProject do
   defp docs do
     [
       main: "readme",
+      api_reference: false,
       source_url: @source_url,
       extra_section: "GUIDES",
       extras: [
         "README.md",
         "CHANGELOG.md",
-        "guides/cheatsheet.cheatmd",
-        "guides/generated_policy.md"
+        "cheatsheets/basics.cheatmd",
+        "cheatsheets/policy_usage.cheatmd",
+        "guides/generated_policy_modules.md"
       ],
       groups_for_extras: [
+        Cheatsheets: [
+          "cheatsheets/basics.cheatmd",
+          "cheatsheets/policy_usage.cheatmd"
+        ],
         Guides: [
-          "guides/cheatsheet.cheatmd",
-          "guides/generated_policy.md"
+          "guides/generated_policy_modules.md"
         ]
       ],
       groups_for_modules: [

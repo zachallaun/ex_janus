@@ -7,12 +7,15 @@ defmodule Janus do
     * Single source of truth: authorization rules should be defined once
       and used for authorizing individual actions as well as composing
       Ecto queries.
+
     * Minimal library footprint: expose a small set of useful functions
       that application authors can use to set up their own optimal
       authorization API.
+
     * Minimal application footprint: "hide" Janus behind application-
       controlled policy modules that define the interface for the rest
       of the application.
+
     * Escape hatches: easily "drop down" to your own code when the
       declarative API doesn't cut it.
 
@@ -22,6 +25,7 @@ defmodule Janus do
     modules_, which describe the allowed actors, actions, and resources
     in your application. This is where you look if you're writing a
     policy module.
+
     * `Janus.Authorization` - functions and behaviour used by the rest
     of your application to authorize and load resources. This is where
     you look if you're using a policy module.
@@ -124,6 +128,7 @@ defmodule Janus do
 
     * `:repo` - `Ecto.Repo` used to load associations when required by
       your authorization rules
+
     * `:load_associations` - Load associations when required by your
       authorization rules (requires `:repo` config option to be set or
       to be passed explicitly at the call site), defaults to `false`
@@ -157,6 +162,7 @@ defmodule Janus do
     * invokes `use Janus.Policy` which imports functions for defining
       policies and injects wrapper definitions for `build_policy/1` and
       `build_policy/2` that support hooks (see `Janus.Policy` for more)
+
     * injects implementations for the `Janus.Authorization` behaviour
 
   ## Options
@@ -164,6 +170,7 @@ defmodule Janus do
     * `:load_associations` - Load associations when required by your
       authorization rules (requires `:repo` config option to be set or
       to be passed explicitly at the call site), defaults to `false`
+
     * `:repo` - `Ecto.Repo` used to load associations when required by
       your authorization rules
 

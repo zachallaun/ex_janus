@@ -6,17 +6,13 @@ This guide documents usage and examples for policy modules generated with `mix j
 
 ## Generating a policy module
 
-Janus ships with a generator that creates a policy module that already contains a handful of useful helper functions.
+The policy generator creates a policy module containing authorization functions that can be used by the rest of your application.
 
 ```sh
 $ mix janus.gen.policy [--module Example.Policy] [--path example/path/policy.ex]
 ```
 
 When run without arguments, it will generate a policy module called `YourApp.Policy` at `lib/your_app/policy.ex` (with `YourApp` replaced by your actual application namespace).
-
-It is important to remember that generated code is _your_ code! It can be modified, replaced, and deleted as you see fit.
-Instead of including them in `Janus`, these helpers are generated as a jumping-off point for your application.
-They enable certain usage patterns that may be helpful, but if they aren't appropriate or useful, toss them and use whatever you see fit!
 
 ## Overview of helpers
 
@@ -25,18 +21,32 @@ The helpers don't cover everything, but they cover a large portion of use-cases 
 
 The following helpers are included in newly-generated policy modules:
 
-- `authorized_fetch_by` - wraps `c:Ecto.Repo.get_by/3`, gets a resource using the given attributes and then authorizes for the given action/user
-- `authorized_fetch_all` - wraps `c:Ecto.Repo.all/2`, fetch a list of resources that are authorized for the given action/user
-- `authorized_insert` - wraps `c:Ecto.Repo.insert/2`, operates on a changeset, failing with a validation error if the inserted resource would not be authorized for the given action/user
-- `authorized_update` - wraps `c:Ecto.Repo.update/2`, operates on a changeset, failing with a validation error if the updated resource would not be authorized for the given action/user either before or after applying changes
-- `authorized_delete` - wraps `c:Ecto.Repo.delete/2`, deletes the given resource if it is authorized for the given action/user
-- `validate_authorized` - changeset validation that can ensure the resource is authorized both prior to and after applying changes (used by other helpers that operate on a changeset)
+* `authorized_fetch_by` - wraps `c:Ecto.Repo.get_by/3`, gets a resource using the given attributes and then authorizes for the given action/user
+
+* `authorized_fetch_all` - wraps `c:Ecto.Repo.all/2`, fetch a list of resources that are authorized for the given action/user
+
+* `authorized_insert` - wraps `c:Ecto.Repo.insert/2`, operates on a changeset, failing with a validation error if the inserted resource would not be authorized for the given action/user
+
+* `authorized_update` - wraps `c:Ecto.Repo.update/2`, operates on a changeset, failing with a validation error if the updated resource would not be authorized for the given action/user either before or after applying changes
+
+* `authorized_delete` - wraps `c:Ecto.Repo.delete/2`, deletes the given resource if it is authorized for the given action/user
+
+* `validate_authorized` - changeset validation that can ensure the resource is authorized both prior to and after applying changes (used by other helpers that operate on a changeset)
 
 We'll go over each of these and how they might be used in the sections that follow.
 
+> #### Note on generated code {: .info}
+>
+> Remember that generated code is _your_ code!
+> It should be modified, replaced, and deleted as you see fit.
+>
+> Instead of including these helpers in `Janus`, they are generated as a starting point for your application.
+> They enable the usage patterns described below, but if they aren't useful to you, toss them and use whatever you see fit!
+
 ## Authorized operations
 
-As the goal is to transition from unauthorized to authorized operations as smoothly as possible, `authorized_*` functions take almost the same arguments as their `Ecto.Repo` counterparts, except that they add additional keyword options related to authorization.
+The goal is to transition from unauthorized to authorized operations as smoothly as possible.
+`authorized_*` functions take the same arguments as their `Ecto.Repo` counterparts, except that they add additional keyword options related to authorization.
 
 Let's look at some examples.
 

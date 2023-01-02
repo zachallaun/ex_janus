@@ -7,16 +7,18 @@ defmodule Mix.Tasks.Janus.Gen.Policy do
 
   Creates the following file:
 
-    * `lib/app_name/policy.ex` - A Janus policy module containing additional authorization
-      helpers
+    * `lib/app_name/policy.ex` - A Janus policy module containing
+      additional authorization helpers (see [Generated Policy Modules](generated_policy_modules.html)
+      for more info)
 
   ## Options
 
-    * `--module` - The name of the generated module, defaults to `AppName.Policy`
-    * `--app` - The name of the application namespace, defaults to your application name
-      camelized, e.g. `AppName`
-    * `--path` - The path (including filename) for the generated module, defaults to
-      `lib/app_name/policy.ex`
+    * `--module` - The name of the generated module, defaults to
+      `AppName.Policy`
+    * `--app` - The name of the application namespace, defaults to your
+      application name camelized, e.g. `AppName`
+    * `--path` - The path (including filename) for the generated module,
+      defaults to `lib/app_name/policy.ex`
   """
 
   use Mix.Task

@@ -1,0 +1,262 @@
+# The Basics
+
+## Installation and setup
+{: .col-2}
+
+### Dependency
+
+#### mix.exs
+
+```elixir
+defp deps do
+  [
+    {:ex_janus, github: "zachallaun/ex_janus"}
+  ]
+end
+```
+
+Ecto v3.9.4 or later and a database that supports lateral joins (like PostgreSQL) is required to use all Janus features.
+
+### Formatter (optional)
+
+#### .formatter.exs
+
+```elixir
+[
+  import_deps: [:ex_janus]
+]
+```
+
+Improves `mix format` support for certain macros.
+
+### Generator
+
+```sh
+$ mix janus.gen.policy
+* creating lib/my_app/policy.ex
+```
+
+Generate a starting policy module for your application.
+For more information, see the [Generated Policy Modules](generated_policy_modules.html) guide.
+
+### Policy module
+
+Your policy module is the interface used by the rest of your application.
+This is usually the only place you should be referring to `Janus` directly.
+
+#### lib/my_app/policy.ex
+
+```elixir
+defmodule MyApp.Policy do
+  use Janus
+
+  @impl true
+  def build_policy(policy, user) do
+    policy
+    |> # authorization rules
+  end
+end
+```
+
+For more information on defining policies, see the [Policy Definition Cheatsheet](policy_definition.html)
+
+## Core concepts
+{: .col-2}
+
+### Schemas
+
+Schemas are modules that `use Ecto.Schema` and are used heavily by Janus.
+
+#### Used when defining policies
+
+```elixir
+policy
+|> allow(:edit, Post, ...)
+#               ^^^^
+```
+
+#### Used when scoping a query
+
+```elixir
+MyApp.Policy.scope(Post, :edit, current_user)
+#                  ^^^^
+```
+
+#### Used when checking for permissions
+
+```elixir
+MyApp.Policy.any_authorized?(Post, :edit, current_user)
+#                            ^^^^
+```
+
+### Resources
+
+Resources are loaded structs defined by one of your schemas.
+
+#### Used when authorizing an action
+
+```elixir
+MyApp.Policy.authorize(%Post{}, :edit, current_user)
+#                      ^^^^^^^
+```
+
+### Actors
+
+Actors are the users of your application.
+They can be a `%User{}` struct, but they don't have to be.
+Actors are converted to a policy using `build_policy/2`, so an actor can be anything that you want to use to differentiate between types of user.
+They can even be a simple atom like `:normal_user` or `:admin_user`.
+
+#### In `build_policy/2`
+
+```elixir
+def build_policy(policy, %User{}) do
+  #                      ^^^^^^^
+end
+```
+
+#### Used when calling any authorization function
+
+```elixir
+MyApp.Policy.authorize(%Post{}, :edit, current_user)
+#                                      ^^^^^^^^^^^^
+
+MyApp.Policy.scope(Post, :edit, current_user)
+#                               ^^^^^^^^^^^^
+```
+
+### Actions
+
+Actions are what actors _do to_ resources in your application.
+Janus doesn't care how you represent actions, but atoms usually do the trick.
+
+#### Used when defining policies
+
+```elixir
+policy
+|> allow(:edit, Post, ...)
+#        ^^^^^
+```
+
+#### Used when calling any authorization function
+
+```elixir
+MyApp.Policy.authorize(%Post{}, :edit, current_user)
+#                               ^^^^^
+```
+
+#### Can be any term except a list
+
+```elixir
+policy
+|> allow(:edit, Post, ...)
+|> allow("edit", Post, ...)
+|> allow(%Action{type: :edit}, Post, ...)
+# lists are special-cased to allow multiple
+# actions to share conditions
+|> allow([:read, :edit], Post, ...)
+```
+
+## Permitting actions
+{: .col-2}
+
+### Grant permission for all resources of schema
+
+```elixir
+policy
+|> allow(:read, Post)
+|> allow(:edit, Post)
+|> allow(:archive, Post)
+|> allow(:read, Comment)
+|> allow(:edit, Comment)
+```
+
+### Using lists of actions
+
+```elixir
+policy
+|> allow([:read, :edit, :archive], Post)
+|> allow([:read, :edit], Comment)
+```
+
+### Grant permission based on attributes
+
+```elixir
+policy
+|> allow(:read, Post, where: [archived: false])
+
+# or define using :where_not
+|> allow(:read, Post, where_not: [archived: true])
+
+# or override a blanket permission using deny
+|> allow(:read, Post)
+|> deny(:read, Post, where: [archived: true])
+```
+
+### Use `deny` to override a previous `allow`
+
+```elixir
+policy
+|> allow(:read, Post)
+|> deny(:read, Post, where: [archived: true])
+```
+
+### Grant permission if the user is associated with the resource
+
+```elixir
+def build_policy(policy, %User{role: :member} = user) do
+  policy
+  |> allow(:edit, Comment, where: [user_id: user.id])
+end
+```
+
+### Grant permission based on association attributes
+
+```elixir
+policy
+|> allow(:edit, Comment, where: [user: [role: :member]])
+```
+
+### Use `allows` to delegate permission to an association
+
+```elixir
+policy
+|> allow(:read, Post, where: [archived: false])
+|> allow(:read, Comment, where: [post: allows(:read)])
+```
+
+### Multiple `allow` combines as a logical-or
+
+```elixir
+# This will always allow reading all posts
+policy
+|> allow(:read, Post)
+|> allow(:read, Post, where: [archived: false]) # has no effect
+```
+
+## Structuring your policies
+{: .col-2}
+
+### Pattern-match to give different permissions to different actors
+
+```elixir
+def build_policy(policy, %User{role: :member}) do
+  # member permissions
+end
+
+def build_policy(policy, %User{role: :moderator}) do
+  # moderator permissions
+end
+```
+
+### Delegate to context-specific policies
+
+```elixir
+def build_policy(policy, actor) do
+  policy
+  |> CommunityForum.Policy.build_policy(actor)
+  |> Storefront.Policy.build_policy(actor)
+end
+```
+
+For larger applications with well-defined boundaries, a policy can be constructed by threading it through multiple `build_policy` calls.

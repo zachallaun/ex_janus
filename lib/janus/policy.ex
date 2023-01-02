@@ -7,9 +7,9 @@ defmodule Janus.Policy do
   and any restrictions to the set of resources that can be accessed.
   These policies are generally created implicitly for actors passed to
   functions defined by `Janus.Authorization`, but they can also be
-  created (and cached) with `build_policy/2`.
+  created with `c:build_policy/2`.
 
-  ## Policy modules
+  ## Creating a policy modules
 
   While you can create a policy module with `use Janus.Policy`, you will
   usually invoke `use Janus` to create a module that implements both
@@ -27,7 +27,7 @@ defmodule Janus.Policy do
   The `build_policy/2` callback is the only callback that is required in
   policy modules.
 
-  ## Using `allow` and `deny`
+  ## Permissions with `allow` and `deny`
 
   Permissions are primarily defined using `allow/4` and `deny/4`, which
   allows or denies an action on a resource if a set of conditions match.
@@ -283,20 +283,16 @@ defmodule Janus.Policy do
   call entirely, immediately returning a policy without running it
   through `c:build_policy/2`.
 
-  `before_build_policy` takes a module name or a tuple containing a module
-  name and some term. The module is expected to define a function
+  `before_build_policy` takes a module name or a tuple containing a
+  module name and some term. The module is expected to define a function
   `before_build_policy/3`.
 
-  The function will receive three arguments:
-
-    * term (defaults to `:default`)
-    * policy
-    * actor
-
-  and it must return one of:
+  The function will receive `term`, `policy` and `actor` and must return
+  one of:
 
     * `{:cont, policy, actor}` - run any further hooks and then
       `c:build_policy/2`
+
     * `{:halt, policy}` - skip any further hooks and `c:build_policy/2`
       and return `policy`
 
@@ -352,8 +348,7 @@ defmodule Janus.Policy do
   @doc """
   Allows an action on the schema if matched by conditions.
 
-  See the section on "Using allow and deny" for a description of
-  conditions.
+  See "Permissions with `allow` and `deny`" for a description of conditions.
 
   ## Examples
 
@@ -380,8 +375,7 @@ defmodule Janus.Policy do
   @doc """
   Denies an action on the schema if matched by conditions.
 
-  See the section on "Using allow and deny" for a description of
-  conditions.
+  See "Permissions with `allow` and `deny`" for a description of conditions.
 
   ## Examples
 
