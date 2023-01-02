@@ -7,7 +7,7 @@ defmodule Janus.Policy do
   and any restrictions to the set of resources that can be accessed.
   These policies are generally created implicitly for actors passed to
   functions defined by `Janus.Authorization`, but they can also be
-  created (and cached) with `policy_for/2`.
+  created (and cached) with `build_policy/2`.
 
   ## Policy modules
 
@@ -19,12 +19,12 @@ defmodule Janus.Policy do
         use Janus
 
         @impl true
-        def policy_for(policy, _user) do
+        def build_policy(policy, _user) do
           policy
         end
       end
 
-  The `policy_for/2` callback is the only callback that is required in
+  The `build_policy/2` callback is the only callback that is required in
   policy modules.
 
   ## Using `allow` and `deny`
@@ -39,7 +39,7 @@ defmodule Janus.Policy do
   their own comments and any comments flagged for review, but not those
   made by an admin.
 
-      def policy_for(policy, %User{role: :moderator} = user) do
+      def build_policy(policy, %User{role: :moderator} = user) do
         policy
         |> allow(:edit, Comment, where: [user: [id: user.id]])
         |> allow(:edit, Comment, where: [flagged_for_review: true])
@@ -59,7 +59,7 @@ defmodule Janus.Policy do
   other. For instance, the moderation example above could also be
   written as:
 
-      def policy_for(policy, %User{role: :moderator} = user) do
+      def build_policy(policy, %User{role: :moderator} = user) do
         policy
         |> allow(:edit, Comment, where: [user_id: user.id])
         |> allow(:edit, Comment,
@@ -78,7 +78,7 @@ defmodule Janus.Policy do
   You can also use `:or_where` to combine with all previous conditions.
   For instance, the two examples above could also be written as:
 
-      def policy_for(policy, %User{role: :moderator} = user) do
+      def build_policy(policy, %User{role: :moderator} = user) do
         policy
         |> allow(:edit, Comment,
           where: [flagged_for_review: true],
@@ -114,7 +114,7 @@ defmodule Janus.Policy do
   keyword syntax presented above. In these cases, you can defer this
   check using an arity-3 function:
 
-      def policy_for(policy, user) do
+      def build_policy(policy, user) do
         policy
         |> allow(:read, Post, where: [published_at: &in_the_past?/3])
       end
@@ -135,14 +135,14 @@ defmodule Janus.Policy do
   that they can handle both operations on a single record and operations
   that should compose with an Ecto query.
 
-  ## `before_policy_for` hooks
+  ## `before_build_policy` hooks
 
-  You can register hooks to be run prior to `c:policy_for/2` using
-  `before_policy_for/1`.  These hooks can be used to change the default
-  (usually empty) policy or actor, or to prevent `c:policy_for/2` from
+  You can register hooks to be run prior to `c:build_policy/2` using
+  `before_build_policy/1`.  These hooks can be used to change the default
+  (usually empty) policy or actor, or to prevent `c:build_policy/2` from
   being run altogether.
 
-  See `before_policy_for/1` for more details.
+  See `before_build_policy/1` for more details.
   """
 
   alias __MODULE__
@@ -171,7 +171,7 @@ defmodule Janus.Policy do
 
   This is the only callback that is required in a policy module.
   """
-  @callback policy_for(t, Janus.actor()) :: t
+  @callback build_policy(t, Janus.actor()) :: t
 
   @doc false
   defmacro __using__(opts \\ []) do
@@ -187,14 +187,14 @@ defmodule Janus.Policy do
       @doc """
       Returns the policy for the given actor.
 
-      See `c:Janus.Policy.policy_for/2` for more information.
+      See `c:Janus.Policy.build_policy/2` for more information.
       """
-      def policy_for(%Janus.Policy{} = policy), do: policy
+      def build_policy(%Janus.Policy{} = policy), do: policy
 
-      def policy_for(actor) do
+      def build_policy(actor) do
         __MODULE__
         |> Janus.Policy.new()
-        |> policy_for(actor)
+        |> build_policy(actor)
       end
     end
   end
@@ -208,9 +208,9 @@ defmodule Janus.Policy do
 
     if hooks != [] do
       quote location: :keep do
-        defoverridable policy_for: 2
+        defoverridable build_policy: 2
 
-        def policy_for(policy, actor) do
+        def build_policy(policy, actor) do
           case Janus.Policy.run_hooks(unquote(hooks), policy, actor) do
             {:cont, policy, actor} -> super(policy, actor)
             {:halt, policy} -> policy
@@ -256,11 +256,11 @@ defmodule Janus.Policy do
   def run_hooks([], policy, actor), do: {:cont, policy, actor}
 
   defp run_hook({module, hook}, policy, actor) when is_atom(module) do
-    module.before_policy_for(hook, policy, actor)
+    module.before_build_policy(hook, policy, actor)
   end
 
   defp run_hook(module, policy, actor) when is_atom(module) do
-    module.before_policy_for(:default, policy, actor)
+    module.before_build_policy(:default, policy, actor)
   end
 
   defp bad_hook_result!(result, hook) do
@@ -275,17 +275,17 @@ defmodule Janus.Policy do
   end
 
   @doc """
-  Registers a hook to be run prior to calling `c:policy_for/2`.
+  Registers a hook to be run prior to calling `c:build_policy/2`.
 
-  `before_policy_for` hooks can be used to alter the default policy or
-  actor that is being passed into `c:policy_for/2`. This could be used
+  `before_build_policy` hooks can be used to alter the default policy or
+  actor that is being passed into `c:build_policy/2`. This could be used
   to preload required associations or fields, or to short-circuit the
   call entirely, immediately returning a policy without running it
-  through `c:policy_for/2`.
+  through `c:build_policy/2`.
 
-  `before_policy_for` takes a module name or a tuple containing a module
+  `before_build_policy` takes a module name or a tuple containing a module
   name and some term. The module is expected to define a function
-  `before_policy_for/3`.
+  `before_build_policy/3`.
 
   The function will receive three arguments:
 
@@ -296,8 +296,8 @@ defmodule Janus.Policy do
   and it must return one of:
 
     * `{:cont, policy, actor}` - run any further hooks and then
-      `c:policy_for/2`
-    * `{:halt, policy}` - skip any further hooks and `c:policy_for/2`
+      `c:build_policy/2`
+    * `{:halt, policy}` - skip any further hooks and `c:build_policy/2`
       and return `policy`
 
   ## Example
@@ -305,14 +305,14 @@ defmodule Janus.Policy do
       defmodule Policy do
         use Janus
 
-        before_policy_for __MODULE__
-        before_policy_for {__MODULE__, :check_banned}
+        before_build_policy __MODULE__
+        before_build_policy {__MODULE__, :check_banned}
 
-        def before_policy_for(:default, policy, user) do
+        def before_build_policy(:default, policy, user) do
           {:cont, policy, preload_required(user)}
         end
 
-        def before_policy_for(:check_banned, policy, user) do
+        def before_build_policy(:check_banned, policy, user) do
           if banned?(user) do
             {:halt, policy}
           else
@@ -326,7 +326,7 @@ defmodule Janus.Policy do
   If desired, hooks can live in another module.
 
       defmodule Policy.Helpers do
-        def before_policy_for(:check_banned, policy, user) do
+        def before_build_policy(:check_banned, policy, user) do
           if User.banned?(user) do
             {:halt, policy}
           else
@@ -338,12 +338,12 @@ defmodule Janus.Policy do
       defmodule Policy do
         use Janus
 
-        before_policy_for {Policy.Helpers, :check_banned}
+        before_build_policy {Policy.Helpers, :check_banned}
 
         # ...
       end
   """
-  defmacro before_policy_for(hook) do
+  defmacro before_build_policy(hook) do
     quote do
       Module.put_attribute(__MODULE__, unquote(@hooks), unquote(hook))
     end

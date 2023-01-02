@@ -124,13 +124,13 @@ defmodule Janus.AuthorizationTest do
     end
 
     test "should allow action if multiple :where attributes match" do
-      policy_for = fn user ->
+      build_policy = fn user ->
         %Janus.Policy{}
         |> allow(:edit, Thread, where: [archived: false, creator_id: user.id])
       end
 
       [user1, user2] = [user_fixture(), user_fixture()]
-      [policy1, policy2] = [policy_for.(user1), policy_for.(user2)]
+      [policy1, policy2] = [build_policy.(user1), build_policy.(user2)]
 
       thread = thread_fixture(%{creator_id: user1.id})
 

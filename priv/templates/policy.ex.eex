@@ -12,9 +12,9 @@ defmodule <%= module %> do
   or a user, in which case a policy struct will be created for that user
   under the hood. If it is desired to cache the policy struct to re-use
   it for multiple calls, for instance in a `Plug.Conn` assign,
-  `policy_for/1` can be used:
+  `build_policy/1` can be used:
 
-      iex> <%= module %>.policy_for(user)
+      iex> <%= module %>.build_policy(user)
       %Janus.Policy{}
 
   In the examples that follow, a policy can take the place of a user
@@ -68,7 +68,7 @@ defmodule <%= module %> do
   alias <%= app %>.Repo
 
   @impl true
-  def policy_for(policy, _user) do
+  def build_policy(policy, _user) do
     # Attach permissions here using the `Janus.Policy` API
     policy
   end
@@ -342,7 +342,7 @@ defmodule <%= module %> do
     case Keyword.pop(opts, :authorize) do
       {{action, actor}, rest} ->
         {extra, rest} = Keyword.split(rest, extra_keys)
-        {{action, policy_for(actor)}, extra, rest}
+        {{action, build_policy(actor)}, extra, rest}
 
       {false, rest} ->
         {_, rest} = Keyword.split(rest, extra_keys)
@@ -372,7 +372,7 @@ defmodule <%= module %> do
       %Ecto.Changeset{}
   """
   def validate_authorized(%Ecto.Changeset{} = changeset, action, actor_or_policy, opts \\ []) do
-    policy = policy_for(actor_or_policy)
+    policy = build_policy(actor_or_policy)
 
     %{message: message, error_key: key} =
       opts

@@ -40,13 +40,13 @@ defmodule Janus do
         use Janus
 
         @impl true
-        def policy_for(policy, _user) do
+        def build_policy(policy, _user) do
           policy
         end
       end
 
   When you invoke `use Janus`, default implementations are injected for
-  required callbacks, except for `c:Janus.Policy.policy_for/2`. This
+  required callbacks, except for `c:Janus.Policy.build_policy/2`. This
   callback is your foundation, as it returns the authorization policy
   for an individual user of your application.
 
@@ -55,7 +55,7 @@ defmodule Janus do
   define actions, resources, and conditions that make up your
   authorization rules.
 
-      def policy_for(policy, %User{role: :moderator} = mod) do
+      def build_policy(policy, %User{role: :moderator} = mod) do
         policy
         |> allow(:read, Post)
         |> allow([:edit, :archive, :unarchive], Post, where: [user: [role: :member]])
@@ -155,8 +155,8 @@ defmodule Janus do
   Invoking `use Janus` does the following:
 
     * invokes `use Janus.Policy` which imports functions for defining
-      policies and injects wrapper definitions for `policy_for/1` and
-      `policy_for/2` that support hooks (see `Janus.Policy` for more)
+      policies and injects wrapper definitions for `build_policy/1` and
+      `build_policy/2` that support hooks (see `Janus.Policy` for more)
     * injects implementations for the `Janus.Authorization` behaviour
 
   ## Options
@@ -175,7 +175,7 @@ defmodule Janus do
         use Janus, repo: MyApp.Repo
 
         @impl true
-        def policy_for(policy, _actor) do
+        def build_policy(policy, _actor) do
           policy
         end
       end
@@ -189,17 +189,17 @@ defmodule Janus do
 
       @impl Janus.Authorization
       def authorize(resource, action, actor, opts \\ []) do
-        Janus.Authorization.authorize(resource, action, policy_for(actor), opts)
+        Janus.Authorization.authorize(resource, action, build_policy(actor), opts)
       end
 
       @impl Janus.Authorization
       def any_authorized?(schema, action, actor) do
-        Janus.Authorization.any_authorized?(schema, action, policy_for(actor))
+        Janus.Authorization.any_authorized?(schema, action, build_policy(actor))
       end
 
       @impl Janus.Authorization
       def scope(query_or_schema, action, actor, opts \\ []) do
-        Janus.Authorization.scope(query_or_schema, action, policy_for(actor), opts)
+        Janus.Authorization.scope(query_or_schema, action, build_policy(actor), opts)
       end
     end
   end

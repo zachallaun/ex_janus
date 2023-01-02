@@ -8,7 +8,7 @@ defmodule JanusTest do
       use Janus
 
       @impl true
-      def policy_for(policy, _) do
+      def build_policy(policy, _) do
         policy
         |> allow(:read, Thread)
       end
@@ -48,7 +48,7 @@ defmodule JanusTest do
                  repo: nil,
                  load_associations: false
                }
-             } = ExamplePolicy.policy_for(:user)
+             } = ExamplePolicy.build_policy(:user)
     end
   end
 
@@ -56,73 +56,73 @@ defmodule JanusTest do
     defmodule ExamplePolicyWithHooks do
       use Janus
 
-      before_policy_for __MODULE__
-      before_policy_for {__MODULE__, :wrap_if_1}
-      before_policy_for {__MODULE__, :halt_if_2}
-      before_policy_for {__MODULE__, :shouldnt_run_after_halt_if_2}
-      before_policy_for {__MODULE__, :invalid_if_3}
+      before_build_policy __MODULE__
+      before_build_policy {__MODULE__, :wrap_if_1}
+      before_build_policy {__MODULE__, :halt_if_2}
+      before_build_policy {__MODULE__, :shouldnt_run_after_halt_if_2}
+      before_build_policy {__MODULE__, :invalid_if_3}
 
-      def before_policy_for(:default, policy, 0) do
+      def before_build_policy(:default, policy, 0) do
         {:cont, policy, {:default, 0}}
       end
 
-      def before_policy_for(:default, policy, actor), do: {:cont, policy, actor}
+      def before_build_policy(:default, policy, actor), do: {:cont, policy, actor}
 
-      def before_policy_for(:wrap_if_1, policy, 1) do
+      def before_build_policy(:wrap_if_1, policy, 1) do
         {:cont, policy, {:wrapped, 1}}
       end
 
-      def before_policy_for(:wrap_if_1, policy, actor), do: {:cont, policy, actor}
+      def before_build_policy(:wrap_if_1, policy, actor), do: {:cont, policy, actor}
 
-      def before_policy_for(:halt_if_2, policy, 2) do
+      def before_build_policy(:halt_if_2, policy, 2) do
         {:halt, policy}
       end
 
-      def before_policy_for(:halt_if_2, policy, actor), do: {:cont, policy, actor}
+      def before_build_policy(:halt_if_2, policy, actor), do: {:cont, policy, actor}
 
-      def before_policy_for(:shouldnt_run_after_halt_if_2, policy, 2) do
+      def before_build_policy(:shouldnt_run_after_halt_if_2, policy, 2) do
         send(self(), :shouldnt_run_after_halt_if_2)
         {:cont, policy, 2}
       end
 
-      def before_policy_for(:shouldnt_run_after_halt_if_2, policy, actor) do
+      def before_build_policy(:shouldnt_run_after_halt_if_2, policy, actor) do
         {:cont, policy, actor}
       end
 
-      def before_policy_for(:invalid_if_3, _policy, 3) do
+      def before_build_policy(:invalid_if_3, _policy, 3) do
         :invalid
       end
 
-      def before_policy_for(:invalid_if_3, policy, actor), do: {:cont, policy, actor}
+      def before_build_policy(:invalid_if_3, policy, actor), do: {:cont, policy, actor}
 
       @impl true
-      def policy_for(policy, actor) do
-        send(self(), {:policy_for, policy, actor})
+      def build_policy(policy, actor) do
+        send(self(), {:build_policy, policy, actor})
         policy
       end
     end
 
     test "should run callback with :default if only module is given" do
-      assert %Janus.Policy{} = ExamplePolicyWithHooks.policy_for(0)
-      assert_received {:policy_for, %Janus.Policy{}, {:default, 0}}
+      assert %Janus.Policy{} = ExamplePolicyWithHooks.build_policy(0)
+      assert_received {:build_policy, %Janus.Policy{}, {:default, 0}}
     end
 
     test "should continue with modified policy/actor if :cont tuple returned" do
-      assert %Janus.Policy{} = ExamplePolicyWithHooks.policy_for(1)
-      assert_received {:policy_for, %Janus.Policy{}, {:wrapped, 1}}
+      assert %Janus.Policy{} = ExamplePolicyWithHooks.build_policy(1)
+      assert_received {:build_policy, %Janus.Policy{}, {:wrapped, 1}}
     end
 
-    test "shouldn't run later hooks or policy_for if :halt tuple returned" do
-      assert %Janus.Policy{} = ExamplePolicyWithHooks.policy_for(2)
+    test "shouldn't run later hooks or build_policy if :halt tuple returned" do
+      assert %Janus.Policy{} = ExamplePolicyWithHooks.build_policy(2)
       refute_received :shouldnt_run_after_halt_if_2
-      refute_received {:policy_for, _, _}
+      refute_received {:build_policy, _, _}
     end
 
     test "raise on invalid return from hook" do
       message = ~r"invalid return from hook `"
 
       assert_raise(ArgumentError, message, fn ->
-        ExamplePolicyWithHooks.policy_for(3)
+        ExamplePolicyWithHooks.build_policy(3)
       end)
     end
   end
@@ -137,12 +137,12 @@ defmodule JanusTest do
               load_associations: true
 
             @impl true
-            def policy_for(policy, _actor), do: policy
+            def build_policy(policy, _actor), do: policy
           end
         end
         |> Code.compile_quoted()
 
-      assert %Janus.Policy{config: config} = module.policy_for(:user)
+      assert %Janus.Policy{config: config} = module.build_policy(:user)
 
       assert %{repo: Example.Repo, load_associations: true} = config
     end
@@ -154,13 +154,13 @@ defmodule JanusTest do
             use Janus, not_valid: true
 
             @impl true
-            def policy_for(policy, _actor), do: policy
+            def build_policy(policy, _actor), do: policy
           end
         end
         |> Code.compile_quoted()
 
       assert_raise ArgumentError, ~r/unknown keys \[:not_valid\]/, fn ->
-        module.policy_for(:user)
+        module.build_policy(:user)
       end
     end
   end

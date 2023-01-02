@@ -1,5 +1,5 @@
 locals_without_parens = [
-  before_policy_for: 1
+  before_build_policy: 1
 ]
 
 [

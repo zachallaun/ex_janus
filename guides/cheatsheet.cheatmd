@@ -26,7 +26,7 @@ defmodule MyApp.Policy do
   use Janus
 
   @impl true
-  def policy_for(policy, user) do
+  def build_policy(policy, user) do
     policy
     |> # authorization rules
   end
@@ -46,7 +46,7 @@ This is usually the only place you should be referring to `Janus` directly.
 ]
 ```
 
-This may be desired if you're using hooks. See `Janus.Policy.before_policy_for/1` for more.
+This may be desired if you're using hooks. See `Janus.Policy.before_build_policy/1` for more.
 
 ## Reference schemas
 {: .col-2}
@@ -148,14 +148,14 @@ MyApp.Policy.authorize(%Post{}, :edit, current_user)
 
 Actors are the users of your application.
 They can be a `%User{}` struct, but they don't have to be.
-Actors are converted to a policy using `policy_for/2`, so an actor can be anything that you want to use to differentiate between types of user.
+Actors are converted to a policy using `build_policy/2`, so an actor can be anything that you want to use to differentiate between types of user.
 They can even be a simple atom like `:normal_user` or `:admin_user`.
 
-#### In `policy_for/2`
+#### In `build_policy/2`
 
 ```elixir
-def policy_for(policy, %User{}) do
-  #                    ^^^^^^^
+def build_policy(policy, %User{}) do
+  #                      ^^^^^^^
 end
 ```
 
@@ -245,7 +245,7 @@ policy
 ### Grant permission if the user is associated with the resource
 
 ```elixir
-def policy_for(policy, %User{role: :member} = user) do
+def build_policy(policy, %User{role: :member} = user) do
   policy
   |> allow(:edit, Comment, where: [user_id: user.id])
 end
@@ -281,11 +281,11 @@ policy
 ### Pattern-match to give different permissions to different actors
 
 ```elixir
-def policy_for(policy, %User{role: :member}) do
+def build_policy(policy, %User{role: :member}) do
   # member permissions
 end
 
-def policy_for(policy, %User{role: :moderator}) do
+def build_policy(policy, %User{role: :moderator}) do
   # moderator permissions
 end
 ```
@@ -293,14 +293,14 @@ end
 ### Delegate to context-specific policies
 
 ```elixir
-def policy_for(policy, actor) do
+def build_policy(policy, actor) do
   policy
-  |> CommunityForum.Policy.policy_for(actor)
-  |> Storefront.Policy.policy_for(actor)
+  |> CommunityForum.Policy.build_policy(actor)
+  |> Storefront.Policy.build_policy(actor)
 end
 ```
 
-For larger applications with well-defined boundaries, a policy can be constructed by threading it through multiple `policy_for` calls.
+For larger applications with well-defined boundaries, a policy can be constructed by threading it through multiple `build_policy` calls.
 
 ## Authorization
 {: .col-2}
@@ -436,10 +436,10 @@ scope(Post, :read, user_or_policy,
 ## Caching a policy
 {: .col-2}
 
-### Call `policy_for/1` to get the policy for a user
+### Call `build_policy/1` to get the policy for a user
 
 ```elixir
-iex> policy = MyApp.Policy.policy_for(current_user)
+iex> policy = MyApp.Policy.build_policy(current_user)
 %Janus.Policy{...}
 ```
 
@@ -460,7 +460,7 @@ def assign_current_policy(conn) do
   %{assigns: %{current_user: user}} = conn
 
   conn
-  |> assign(:current_policy, MyApp.Policy.policy_for(user))
+  |> assign(:current_policy, MyApp.Policy.build_policy(user))
 end
 ```
 
