@@ -1,21 +1,16 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
-
 ## v0.2.0 (Unreleased)
 
-### Added
+### Enhancements
 
-- (Janus) `use Janus` accepts optional defaults for `Janus.Authorization.authorize/4` options.
-- (Janus.Authorization) `authorize/4` adds `:repo` and `:load_assocations` options.
-- (mix janus.gen.policy) Overhaul generated policy helpers to more easily replace `Ecto.Repo` callbacks.
-
-### Changed
-
-- (Breaking / Janus.Authorization) `policy_for` renamed to `build_policy`.
-- (Breaking / Janus.Authorization) `filter_authorized` renamed to `scope`.
-- (Breaking / Janus.authorization) `authorize` now returns `{:error, :not_authorized}` instead of `:error`.
+  * [Janus] `use Janus` accepts optional defaults for `Janus.Authorization.authorize/4` options
+  * [Janus.Authorization] `authorize/4` adds `:repo` and `:load_assocations` options
+  * [Janus.Authorization] **Breaking:** `authorize` now returns `{:error, :not_authorized}` instead of `:error`
+  * [Janus.Authorization] **Breaking:** `policy_for` renamed to `build_policy`
+  * [Janus.Authorization] **Breaking:** `filter_authorized` renamed to `scope`
+  * [mix janus.gen.policy] Overhaul generated policy helpers to more easily replace `Ecto.Repo` callbacks
 
 ## v0.1.0 (2022-12-25)
 
-This marks the first release of Janus.
+First release.
