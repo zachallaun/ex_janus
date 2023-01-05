@@ -1,23 +1,24 @@
 defmodule Janus do
   @moduledoc """
-  Authorization superpowers for your `Ecto` schemas.
+  Authorization superpowers for applications using `Ecto`.
 
   Janus prioritizes:
 
-    * Single source of truth: authorization rules should be defined once
-      and used for authorizing individual actions as well as composing
-      Ecto queries.
+    Priorities:
 
-    * Minimal library footprint: expose a small set of useful functions
-      that application authors can use to set up their own optimal
-      authorization API.
+    * Single source of truth - The same rules that authorize loaded data
+      should be able to load authorized data.
 
-    * Minimal application footprint: "hide" Janus behind
-      application-controlled policy modules that define the interface
-      for the rest of the application.
+    * Authentication-agnostic - Janus should not care about how users
+      are modeled or authenticated.
 
-    * Escape hatches: easily "drop down" to your own code when the
-      declarative API doesn't cut it.
+    * Minimal library footprint - Expose a small but flexible API that
+      can be used to create an optimal authorization interface for each
+      application.
+
+    * Escape hatches where necessary - Complex authorization rules and
+      use-cases should be representable when Janus neglects to provide a
+      short cut.
 
   Janus is split into two primary components:
 

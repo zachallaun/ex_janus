@@ -1,8 +1,13 @@
 # Generated Policy Modules
 
-**This guide is a work in progress.**
+> #### Work in progress {: .warning}
+>
+> This guide is incomplete, though its contents may still be useful if you're getting started.
 
-This guide documents usage and examples for policy modules generated with `mix janus.gen.policy` .
+Janus defines a small but flexible API that can be used to create a higher-level authorization interface for your application.
+To support common conventions, like the use of Phoenix-style context modules, Janus provides a policy generator that defines helpers that are especially useful in those circumstances.
+
+The goal of this guide is to explain the usage of, and reasoning behind, those helpers.
 
 ## Generating a policy module
 
