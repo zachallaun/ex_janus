@@ -134,21 +134,11 @@ defmodule Janus.Policy do
   clauses based on their first argument, `:boolean` or `:dynamic`, so
   that they can handle both operations on a single record and operations
   that should compose with an Ecto query.
-
-  ## `before_build_policy` hooks
-
-  You can register hooks to be run prior to `c:build_policy/2` using
-  `before_build_policy/1`.  These hooks can be used to change the default
-  (usually empty) policy or actor, or to prevent `c:build_policy/2` from
-  being run altogether.
-
-  See `before_build_policy/1` for more details.
   """
 
   alias __MODULE__
   alias __MODULE__.Rule
 
-  @hooks :__janus_hooks__
   @config :__janus_policy_config__
 
   @config_defaults [
@@ -177,8 +167,6 @@ defmodule Janus.Policy do
   defmacro __using__(opts \\ []) do
     quote location: :keep do
       @behaviour Janus.Policy
-      @before_compile Janus.Policy
-      Module.register_attribute(__MODULE__, unquote(@hooks), accumulate: true)
       Module.register_attribute(__MODULE__, unquote(@config), persist: true)
       Module.put_attribute(__MODULE__, unquote(@config), unquote(opts))
 
@@ -195,27 +183,6 @@ defmodule Janus.Policy do
         __MODULE__
         |> Janus.Policy.new()
         |> build_policy(actor)
-      end
-    end
-  end
-
-  @doc false
-  defmacro __before_compile__(env) do
-    hooks =
-      env.module
-      |> Module.get_attribute(@hooks)
-      |> Enum.reverse()
-
-    if hooks != [] do
-      quote location: :keep do
-        defoverridable build_policy: 2
-
-        def build_policy(policy, actor) do
-          case Janus.Policy.run_hooks(unquote(hooks), policy, actor) do
-            {:cont, policy, actor} -> super(policy, actor)
-            {:halt, policy} -> policy
-          end
-        end
       end
     end
   end
@@ -242,107 +209,6 @@ defmodule Janus.Policy do
       |> Enum.into(policy.config || %{})
 
     %{policy | config: config}
-  end
-
-  @doc false
-  def run_hooks([hook | hooks], policy, actor) do
-    case run_hook(hook, policy, actor) do
-      {:cont, %Janus.Policy{} = policy, actor} -> run_hooks(hooks, policy, actor)
-      {:halt, %Janus.Policy{} = policy} -> {:halt, policy}
-      other -> bad_hook_result!(other, hook)
-    end
-  end
-
-  def run_hooks([], policy, actor), do: {:cont, policy, actor}
-
-  defp run_hook({module, hook}, policy, actor) when is_atom(module) do
-    module.before_build_policy(hook, policy, actor)
-  end
-
-  defp run_hook(module, policy, actor) when is_atom(module) do
-    module.before_build_policy(:default, policy, actor)
-  end
-
-  defp bad_hook_result!(result, hook) do
-    raise ArgumentError, """
-    invalid return from hook `#{inspect(hook)}`. Expected one of:
-
-        {:cont, %Janus.Policy{}, actor}
-        {:halt, %Janus.Policy{}}
-
-    Got: #{inspect(result)}
-    """
-  end
-
-  @doc """
-  Registers a hook to be run prior to calling `c:build_policy/2`.
-
-  `before_build_policy` hooks can be used to alter the default policy or
-  actor that is being passed into `c:build_policy/2`. This could be used
-  to preload required associations or fields, or to short-circuit the
-  call entirely, immediately returning a policy without running it
-  through `c:build_policy/2`.
-
-  `before_build_policy` takes a module name or a tuple containing a
-  module name and some term. The module is expected to define a function
-  `before_build_policy/3`.
-
-  The function will receive `term`, `policy` and `actor` and must return
-  one of:
-
-    * `{:cont, policy, actor}` - run any further hooks and then
-      `c:build_policy/2`
-
-    * `{:halt, policy}` - skip any further hooks and `c:build_policy/2`
-      and return `policy`
-
-  ## Example
-
-      defmodule Policy do
-        use Janus
-
-        before_build_policy __MODULE__
-        before_build_policy {__MODULE__, :check_banned}
-
-        def before_build_policy(:default, policy, user) do
-          {:cont, policy, preload_required(user)}
-        end
-
-        def before_build_policy(:check_banned, policy, user) do
-          if banned?(user) do
-            {:halt, policy}
-          else
-            {:cont, policy, user}
-          end
-        end
-
-        # ...
-      end
-
-  If desired, hooks can live in another module.
-
-      defmodule Policy.Helpers do
-        def before_build_policy(:check_banned, policy, user) do
-          if User.banned?(user) do
-            {:halt, policy}
-          else
-            {:cont, policy, user}
-          end
-        end
-      end
-
-      defmodule Policy do
-        use Janus
-
-        before_build_policy {Policy.Helpers, :check_banned}
-
-        # ...
-      end
-  """
-  defmacro before_build_policy(hook) do
-    quote do
-      Module.put_attribute(__MODULE__, unquote(@hooks), unquote(hook))
-    end
   end
 
   @doc """

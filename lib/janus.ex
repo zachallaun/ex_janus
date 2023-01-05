@@ -157,13 +157,14 @@ defmodule Janus do
   Sets up a module to implement the `Janus.Policy` and
   `Janus.Authorization` behaviours.
 
-  Invoking `use Janus` does the following:
+  Using `use Janus` does the following:
 
-    * invokes `use Janus.Policy` which imports functions for defining
-      policies and injects wrapper definitions for `build_policy/1` and
-      `build_policy/2` that support hooks (see `Janus.Policy` for more)
+    * adds the `Janus.Policy` behaviour, imports functions used to
+      define the required callback `c:Janus.Policy.build_policy/2`, and
+      defines a `build_policy/1` helper
 
-    * injects implementations for the `Janus.Authorization` behaviour
+    * adds the `Janus.Authorization` behaviour and injects default
+      (overridable) implementations for all callbacks
 
   ## Options
 
@@ -184,6 +185,7 @@ defmodule Janus do
         @impl true
         def build_policy(policy, _actor) do
           policy
+          # |> allow(...)
         end
       end
   """
@@ -208,6 +210,8 @@ defmodule Janus do
       def scope(query_or_schema, action, actor, opts \\ []) do
         Janus.Authorization.scope(query_or_schema, action, build_policy(actor), opts)
       end
+
+      defoverridable authorize: 4, any_authorized?: 3, scope: 4
     end
   end
 end

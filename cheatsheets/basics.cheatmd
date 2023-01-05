@@ -17,18 +17,6 @@ end
 
 Ecto v3.9.4 or later and a database that supports lateral joins (like PostgreSQL) is required to use all Janus features.
 
-### Formatter (optional)
-
-#### .formatter.exs
-
-```elixir
-[
-  import_deps: [:ex_janus]
-]
-```
-
-Improves `mix format` support for certain macros.
-
 ### Generator
 
 ```sh
