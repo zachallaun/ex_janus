@@ -352,8 +352,8 @@ defmodule Janus.Policy do
     * `fun` - the hook function, see "Hooks" below
 
   If the given `name` is already present, an error will be raised. If
-  you wish to replace a hook, you can use `detach_hook/3` before re-
-  attaching the hook. If you only wish to add a hook if it is hasn't
+  you wish to replace a hook, you can use `detach_hook/3` before
+  re-attaching the hook. If you only wish to add a hook if it is hasn't
   already been added, use `attach_new_hook/4` instead.
 
   Hooks will be run in the order that they are attached.

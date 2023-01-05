@@ -12,9 +12,9 @@ defmodule Janus do
       that application authors can use to set up their own optimal
       authorization API.
 
-    * Minimal application footprint: "hide" Janus behind application-
-      controlled policy modules that define the interface for the rest
-      of the application.
+    * Minimal application footprint: "hide" Janus behind
+      application-controlled policy modules that define the interface
+      for the rest of the application.
 
     * Escape hatches: easily "drop down" to your own code when the
       declarative API doesn't cut it.
@@ -54,8 +54,8 @@ defmodule Janus do
   callback is your foundation, as it returns the authorization policy
   for an individual user of your application.
 
-  The policy above is not very useful -- it doesn't allow anyone to do
-  anything -- but that can be changed by using the `Janus.Policy` API to
+  The policy above is not very useful (it doesn't allow anyone to do
+  anything) but that can be changed by using the `Janus.Policy` API to
   define actions, resources, and conditions that make up your
   authorization rules.
 
