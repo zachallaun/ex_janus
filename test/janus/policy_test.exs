@@ -134,4 +134,96 @@ defmodule Janus.PolicyTest do
       assert [%{id: ^t2_id}] = Auth.scope(Thread, :edit, p2) |> Repo.all()
     end
   end
+
+  describe "hooks" do
+    test "should be added with attach_hook/4" do
+      policy =
+        %Janus.Policy{}
+        |> attach_hook(:my_hook_1, fn _, resource, _ -> {:cont, resource} end)
+        |> attach_hook(:my_hook_2, fn _, resource, _ -> {:cont, resource} end)
+        |> attach_hook(:my_hook_1, Thread, fn _, resource, _ -> {:cont, resource} end)
+        |> attach_hook(:my_hook_2, Thread, fn _, resource, _ -> {:cont, resource} end)
+
+      assert %{
+               Thread => [my_hook_1: _, my_hook_2: _],
+               all: [my_hook_1: _, my_hook_2: _]
+             } = policy.hooks
+    end
+
+    test "should be removed with detach_hook/3" do
+      policy =
+        %Janus.Policy{}
+        |> attach_hook(:my_hook_1, fn _, query, _ -> {:cont, query} end)
+        |> attach_hook(:my_hook_2, fn _, query, _ -> {:cont, query} end)
+        |> attach_hook(:my_hook_1, Thread, fn _, query, _ -> {:cont, query} end)
+        |> attach_hook(:my_hook_2, Thread, fn _, query, _ -> {:cont, query} end)
+        |> detach_hook(:my_hook_1)
+        |> detach_hook(:my_hook_1, Thread)
+
+      assert %{
+               Thread => [my_hook_2: _],
+               all: [my_hook_2: _]
+             } = policy.hooks
+    end
+
+    test "should be added with attach_new_hook/4 if name doesn't exist for stage" do
+      policy =
+        %Janus.Policy{}
+        |> attach_hook(:my_hook_1, fn _, resource, _ -> {:cont, resource} end)
+        |> attach_new_hook(:my_hook_1, fn _, resource, _ -> {:cont, resource} end)
+        |> attach_new_hook(:my_hook_2, fn _, resource, _ -> {:cont, resource} end)
+        |> attach_hook(:my_hook_1, Thread, fn _, resource, _ -> {:cont, resource} end)
+        |> attach_new_hook(:my_hook_1, Thread, fn _, resource, _ -> {:cont, resource} end)
+        |> attach_new_hook(:my_hook_2, Thread, fn _, resource, _ -> {:cont, resource} end)
+
+      assert %{
+               Thread => [my_hook_1: _, my_hook_2: _],
+               all: [my_hook_1: _, my_hook_2: _]
+             } = policy.hooks
+    end
+
+    test "raise if attach_hook/5 uses an existing name" do
+      message = "hook :my_hook for :all already exists"
+
+      assert_raise ArgumentError, message, fn ->
+        %Janus.Policy{}
+        |> attach_hook(:my_hook, fn _, resource, _ -> {:cont, resource} end)
+        |> attach_hook(:my_hook, fn _, resource, _ -> {:cont, resource} end)
+      end
+
+      message = "hook :my_hook for JanusTest.Schemas.Thread already exists"
+
+      assert_raise ArgumentError, message, fn ->
+        %Janus.Policy{}
+        |> attach_hook(:my_hook, Thread, fn _, resource, _ -> {:cont, resource} end)
+        |> attach_hook(:my_hook, Thread, fn _, resource, _ -> {:cont, resource} end)
+      end
+    end
+
+    test "raise if attach_hook/5 passed an invalid hook" do
+      message = ~r"received invalid hook :my_hook for :all"
+
+      assert_raise ArgumentError, message, fn ->
+        %Janus.Policy{}
+        |> attach_hook(:my_hook, fn -> nil end)
+      end
+
+      assert_raise ArgumentError, message, fn ->
+        %Janus.Policy{}
+        |> attach_hook(:my_hook, :not_a_function)
+      end
+
+      message = ~r"received invalid hook :my_hook for JanusTest.Schemas.Thread"
+
+      assert_raise ArgumentError, message, fn ->
+        %Janus.Policy{}
+        |> attach_hook(:my_hook, Thread, fn -> nil end)
+      end
+
+      assert_raise ArgumentError, message, fn ->
+        %Janus.Policy{}
+        |> attach_hook(:my_hook, Thread, :not_a_function)
+      end
+    end
+  end
 end

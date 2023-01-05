@@ -134,10 +134,17 @@ defmodule Janus.Policy do
   clauses based on their first argument, `:boolean` or `:dynamic`, so
   that they can handle both operations on a single record and operations
   that should compose with an Ecto query.
+
+  ## Hooks
+
+  Functions can be registered as hooks that run prior to authorization
+  calls. See `attach_hook/4` for more information.
   """
 
   alias __MODULE__
   alias __MODULE__.Rule
+
+  alias Janus.Authorization
 
   @config :__janus_policy_config__
 
@@ -146,15 +153,22 @@ defmodule Janus.Policy do
     load_associations: false
   ]
 
-  defstruct [:module, config: %{}, rules: %{}]
+  defstruct [:module, config: %{}, rules: %{}, hooks: %{}]
 
   @type t :: %Policy{
           module: module(),
           config: map(),
           rules: %{
             {Janus.schema_module(), Janus.action()} => Rule.t()
+          },
+          hooks: %{
+            optional(Janus.schema_module() | :all) => keyword(hook)
           }
         }
+
+  @type hook ::
+          (Ecto.Schema.t() | Authorization.filterable(), Janus.action(), t ->
+             {:cont, Ecto.Schema.t() | Authorization.filterable()} | :halt)
 
   @doc """
   Returns the policy for the given actor.
@@ -170,7 +184,7 @@ defmodule Janus.Policy do
       Module.register_attribute(__MODULE__, unquote(@config), persist: true)
       Module.put_attribute(__MODULE__, unquote(@config), unquote(opts))
 
-      import Janus.Policy, except: [rule_for: 3]
+      import Janus.Policy, except: [rule_for: 3, run_hooks: 4]
 
       @doc """
       Returns the policy for the given actor.
@@ -324,5 +338,185 @@ defmodule Janus.Policy do
 
   defp put_rule(%Rule{schema: schema, action: action} = rule, policy) do
     update_in(policy.rules, &Map.put(&1, {schema, action}, rule))
+  end
+
+  @doc """
+  Attach a hook to the policy.
+
+  Expects the following arguments:
+
+    * `policy` - the `%Janus.Policy{}` struct to attach to
+    * `name` - an atom identifying the hook
+    * `schema` (default `:all`) - an Ecto schema module identifying the
+      resource or query source that the hook should be applied to
+    * `fun` - the hook function, see "Hooks" below
+
+  If the given `name` is already present, an error will be raised. If
+  you wish to replace a hook, you can use `detach_hook/3` before re-
+  attaching the hook. If you only wish to add a hook if it is hasn't
+  already been added, use `attach_new_hook/4` instead.
+
+  Hooks will be run in the order that they are attached.
+
+  ## Hooks
+
+  Hooks are anonymous or captured functions that accept three arguments:
+
+    * `operation` - one of `:authorize` or `:scope`
+    * `object` - either a struct (for `:authorize`) or a queryable (for
+      `:scope`) that is being authorized
+    * `action` - the action being authorized
+
+  Hooks must return one of the following:
+
+    * `{:cont, object}` - additional hooks and authorization continue
+    * `:halt` - halt authorization, running no additional hooks and
+      returning `{:error, :not_authorized}` for an `:authorize`
+      operation and an empty query for a `:scope` operation
+
+  ## Examples
+
+  When writing hooks, you must ensure that all possible arguments are
+  handled. This can be done using a "catch-all" clause. For example:
+
+      policy
+      |> attach_hook(:preload_user, fn
+        :authorize, %Post{} = resource, _action ->
+          {:cont, Repo.preload(resource, :user)}
+
+        _operation, object, _action ->
+          {:cont, object}
+      end)
+
+      policy
+      |> attach_hook(:preload_user, Post, fn
+        :authorize, resource, _action ->
+          {:cont, Repo.preload(resource, :user)}
+
+        _operation, object, _action ->
+          {:cont, object}
+      end)
+
+  Hooks can also be captured functions. For example:
+
+      policy
+      |> attach_hook(:preload_user, Post, &preload_user/3)
+
+      # elsewhere in your module
+
+      defp preload_user(:authorize, resource, _action) do
+        {:cont, Repo.preload(resource, :user)}
+      end
+
+      defp preload_user(:scope, query, _action) do
+        {:cont, from(query, preload: :user)}
+      end
+
+  If `:halt` is returned from a hook, no further hooks will be run and
+  nothing will be authorized. This could be used to perform a check on
+  banned users, for example:
+
+      @impl true
+      def build_policy(policy, user) do
+        policy
+        |> attach_hook(:ensure_unbanned, fn _op, object, _action ->
+          if Accounts.banned?(user.id) do
+            :halt
+          else
+            {:cont, object}
+          end
+        end)
+      end
+
+  This may be required if policies are being cached, since the hook runs
+  every time the authorization call happens, instead of only once when
+  the policy is built.
+  """
+  @spec attach_hook(t, atom(), :all | Janus.schema_module(), hook) :: t
+  def attach_hook(%Policy{hooks: hooks} = policy, name, schema \\ :all, fun)
+      when is_atom(name) and is_atom(schema) do
+    validate_hook!(name, schema, fun)
+    %{policy | hooks: put_hook!(hooks, schema, name, fun)}
+  end
+
+  @doc """
+  Attach a new hook to the policy.
+
+  Like `attach_hook/4`, except it only attaches the hook if the `name`
+  isn't present for the given schema.
+  """
+  @spec attach_new_hook(t, atom(), :all | Janus.schema_module(), hook) :: t
+  def attach_new_hook(%Policy{hooks: hooks} = policy, name, schema \\ :all, fun)
+      when is_atom(name) and is_atom(schema) do
+    validate_hook!(name, schema, fun)
+    %{policy | hooks: put_new_hook(hooks, schema, name, fun)}
+  end
+
+  @doc """
+  Detach a hook from the policy.
+  """
+  @spec detach_hook(t, atom(), :all | Janus.schema_module()) :: t
+  def detach_hook(%Policy{hooks: hooks} = policy, name, schema \\ :all) do
+    %{policy | hooks: delete_hook(hooks, schema, name)}
+  end
+
+  defp validate_hook!(_name, _schema, fun) when is_function(fun, 3), do: :ok
+
+  defp validate_hook!(name, schema, _other) do
+    raise ArgumentError,
+          "received invalid hook #{inspect(name)} for #{inspect(schema)}, " <>
+            "must be a function that accepts 3 arguments"
+  end
+
+  defp put_hook!(hooks, key, name, fun) do
+    Map.update(hooks, key, [{name, fun}], fn kw ->
+      Keyword.update(kw, name, fun, fn _ ->
+        raise ArgumentError, "hook #{inspect(name)} for #{inspect(key)} already exists"
+      end)
+    end)
+  end
+
+  defp put_new_hook(hooks, key, name, fun) do
+    Map.update(hooks, key, [{name, fun}], fn kw ->
+      Keyword.update(kw, name, fun, &Function.identity/1)
+    end)
+  end
+
+  defp delete_hook(hooks, key, name) do
+    Map.update(hooks, key, [], &Keyword.delete(&1, name))
+  end
+
+  @doc false
+  def run_hooks(stage, object, action, %Policy{hooks: hooks}) do
+    schema = resolve_schema_for_stage(stage, object)
+    funs = Map.get(hooks, :all, []) ++ Map.get(hooks, schema, [])
+
+    Enum.reduce_while(funs, {:cont, object}, fn {name, fun}, {:cont, object} ->
+      case fun.(stage, object, action) do
+        {:cont, object} ->
+          {:cont, {:cont, object}}
+
+        :halt ->
+          {:halt, :halt}
+
+        other ->
+          raise ArgumentError, """
+          hook #{inspect(name)} returned an invalid result.
+          Valid results are:"
+
+            * {:cont, resource_or_query}
+            * :halt
+
+          Got: #{inspect(other)}
+          """
+      end
+    end)
+  end
+
+  defp resolve_schema_for_stage(:authorize, %schema{}), do: schema
+
+  defp resolve_schema_for_stage(:scope, query) do
+    {_query, schema} = Janus.Utils.resolve_query_and_schema!(query)
+    schema
   end
 end

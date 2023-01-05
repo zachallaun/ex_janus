@@ -145,8 +145,16 @@ policy
 |> allow([:read, :edit], Post, ...)
 ```
 
-## Permitting actions
+## Defining rules
 {: .col-2}
+
+### Overview
+
+Authorization rules are attached to policies in the `build_policy/2` callback.
+
+* `Janus.Policy.allow/4`
+* `Janus.Policy.deny/4`
+* `Janus.Policy.allows/1`
 
 ### Grant permission for all resources of schema
 
@@ -221,6 +229,113 @@ policy
 |> allow(:read, Post)
 |> allow(:read, Post, where: [archived: false]) # has no effect
 ```
+
+## Hooks
+{: .col-2}
+
+### Overview
+
+Hooks are attached to policies in the `build_policy/2` callback.
+They are called prior to `authorize` or `scope` and can modify the resource/query or halt authorization altogether.
+
+* `Janus.Policy.attach_hook/4`
+* `Janus.Policy.attach_new_hook/4`
+* `Janus.Policy.detach_hook/3`
+
+### Run prior to authorizing any schema
+
+```elixir
+policy
+|> attach_hook(:my_hook, fn
+  :authorize, resource, _action ->
+    {:cont, resource}
+
+  :scope, query, _action ->
+    {:cont, query}
+end)
+```
+
+### Run prior to authorizing a specific schema
+
+```elixir
+policy
+|> attach_hook(:my_hook, Post, fn
+  :authorize, resource, _action ->
+    {:cont, resource}
+
+  :scope, query, _action ->
+    {:cont, query}
+end)
+```
+
+### Used to preload fields
+
+```elixir
+policy
+|> attach_hook(:preload_user, Post, fn
+  :authorize, post, _action ->
+    {:cont, Repo.preload(post, :user)}
+
+  :scope, query, _action ->
+    {:cont, query}
+end)
+```
+
+### Remove attached hooks with `detach_hook/3`
+
+```elixir
+policy
+|> attach_hook(:my_hook, &my_hook/3)
+|> detach_hook(:my_hook)
+```
+
+```elixir
+policy
+|> attach_hook(:my_hook, Post, &my_hook/3)
+|> detach_hook(:my_hook, Post)
+```
+
+### Attach hook if it's new using `attach_new_hook/4`
+
+```elixir
+# second call has no effect
+policy
+|> attach_new_hook(:my_hook, &my_hook/3)
+|> attach_new_hook(:my_hook, &my_other_hook/3)
+```
+
+```elixir
+# second call has no effect
+policy
+|> attach_new_hook(:my_hook, Post, &my_hook/3)
+|> attach_new_hook(:my_hook, Post, &my_other_hook/3)
+```
+
+```elixir
+# attaches second hook because :my_hook not added for Post
+policy
+|> attach_new_hook(:my_hook, &my_hook/3)
+|> attach_new_hook(:my_hook, Post, &my_other_hook/3)
+```
+
+### Run a late check before each authorization call
+
+```elixir
+@impl true
+def build_policy(policy, user) do
+  policy
+  |> attach_hook(:ensure_unbanned, fn _, object, _ ->
+    if Accounts.banned?(user.id) do
+      :halt
+    else
+      {:cont, object}
+    end
+  end)
+  |> ...
+end
+```
+
+This can be useful if policies are being cached. If the call to `Accounts.banned?(user.id)` occurred in the callback body instead, the policy could not react to any change in account status after it was built.
 
 ## Structuring your policies
 {: .col-2}

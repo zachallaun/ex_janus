@@ -561,4 +561,60 @@ defmodule Janus.AuthorizationTest do
       end
     end
   end
+
+  describe "hooks" do
+    test "should pass the object through" do
+      thread = thread_fixture() |> Ecto.reset_fields([:creator])
+
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Thread)
+        |> attach_hook(:preload_creator, Thread, fn
+          :authorize, thread, :read ->
+            {:cont, Repo.preload(thread, :creator)}
+
+          :scope, query, :read ->
+            {:cont, from(query, select_merge: %{title: "foo"})}
+        end)
+
+      assert %Thread{creator: %Ecto.Association.NotLoaded{}} = thread
+      assert {:ok, %Thread{creator: %User{}}} = Auth.authorize(thread, :read, policy)
+      assert [%Thread{title: "foo"}] = Auth.scope(Thread, :read, policy) |> Repo.all()
+    end
+
+    test "should not authorize anything if :halt returned" do
+      %{posts: [post]} = thread = thread_fixture()
+
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Thread)
+        |> allow(:read, Post)
+        |> attach_hook(:do_halt, Thread, fn _, _, _ -> :halt end)
+
+      assert {:error, :not_authorized} = Auth.authorize(thread, :read, policy)
+      assert [] = Auth.scope(Thread, :read, policy) |> Repo.all()
+
+      assert {:ok, %Post{}} = Auth.authorize(post, :read, policy)
+      assert [%Post{}] = Auth.scope(Post, :read, policy) |> Repo.all()
+    end
+
+    test "raise on invalid return" do
+      thread = thread_fixture()
+
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Thread)
+        |> attach_hook(:should_raise, fn _, _, _ -> :bad end)
+
+      message = ~r"hook :should_raise returned an invalid result"
+
+      assert_raise ArgumentError, message, fn ->
+        Auth.authorize(thread, :read, policy)
+      end
+
+      assert_raise ArgumentError, message, fn ->
+        Auth.scope(Thread, :read, policy)
+      end
+    end
+  end
 end

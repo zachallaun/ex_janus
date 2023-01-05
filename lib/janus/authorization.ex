@@ -21,6 +21,8 @@ defmodule Janus.Authorization do
   See individual function documentation for details.
   """
 
+  alias __MODULE__.Filter
+
   alias Janus.Policy
 
   @type filterable :: Janus.schema_module() | Ecto.Query.t()
@@ -182,7 +184,13 @@ defmodule Janus.Authorization do
   """
   @spec scope(filterable, Janus.action(), Policy.t(), keyword()) :: Ecto.Query.t()
   def scope(query_or_schema, action, policy, opts \\ []) do
-    Janus.Authorization.Filter.filter(query_or_schema, action, policy, opts)
+    case Policy.run_hooks(:scope, query_or_schema, action, policy) do
+      {:cont, query_or_schema} ->
+        Filter.filter(query_or_schema, action, policy, opts)
+
+      :halt ->
+        Filter.filter(query_or_schema, action, %Janus.Policy{}, opts)
+    end
   end
 
   @doc """
@@ -220,11 +228,17 @@ defmodule Janus.Authorization do
     policy = Policy.merge_config(policy, opts)
     rule = Policy.rule_for(policy, action, schema)
 
-    with {:ok, resource} <- run_rule(rule, :allow, resource, policy),
-         {:error, resource} <- run_rule(rule, :deny, resource, policy) do
-      {:ok, resource}
-    else
-      _ -> {:error, :not_authorized}
+    case Policy.run_hooks(:authorize, resource, action, policy) do
+      {:cont, resource} ->
+        with {:ok, resource} <- run_rule(rule, :allow, resource, policy),
+             {:error, resource} <- run_rule(rule, :deny, resource, policy) do
+          {:ok, resource}
+        else
+          _ -> {:error, :not_authorized}
+        end
+
+      :halt ->
+        {:error, :not_authorized}
     end
   end
 
