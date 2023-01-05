@@ -2,9 +2,7 @@ defmodule Janus do
   @moduledoc """
   Authorization superpowers for applications using `Ecto`.
 
-  Janus prioritizes:
-
-    Priorities:
+  Priorities:
 
     * Single source of truth - The same rules that authorize loaded data
       should be able to load authorized data.
