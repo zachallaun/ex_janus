@@ -10,7 +10,7 @@
 ```elixir
 defp deps do
   [
-    {:ex_janus, "~> 0.2.0-alpha.3"}
+    {:ex_janus, "~> 0.2.0"}
   ]
 end
 ```
