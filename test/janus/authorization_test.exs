@@ -95,6 +95,18 @@ defmodule Janus.AuthorizationTest do
       assert {:error, :not_authorized} = Auth.authorize(thread, :ready, policy)
       assert [] = Auth.scope(Post, :read, policy) |> Repo.all()
     end
+
+    test "should override conditional allows" do
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Thread, where: [id: 0])
+        |> allow(:read, Thread)
+
+      thread = thread_fixture()
+
+      assert {:ok, ^thread} = Auth.authorize(thread, :read, policy)
+      assert [%Thread{}] = Auth.scope(Thread, :read, policy) |> Repo.all()
+    end
   end
 
   describe "attribute permissions" do
@@ -387,6 +399,17 @@ defmodule Janus.AuthorizationTest do
       assert {:error, :not_authorized} = Auth.authorize(t2, :read, p2)
       assert [] = Auth.scope(Thread, :read, p2) |> Repo.all()
     end
+
+    test "should allow associations using :or_where" do
+      t = thread_fixture(%{archived: true})
+
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Thread, where: [archived: false], or_where: [creator: [id: t.creator_id]])
+
+      assert {:ok, ^t} = Auth.authorize(t, :read, policy)
+      assert [%Thread{}] = Auth.scope(Thread, :read, policy) |> Repo.all()
+    end
   end
 
   describe ":preload_authorized" do
@@ -519,6 +542,50 @@ defmodule Janus.AuthorizationTest do
 
       assert {:ok, ^post} = Auth.authorize(post, :read, policy)
       assert [_, _] = Auth.scope(Post, :read, policy) |> Repo.all()
+    end
+
+    test "allows/1 in allow/4 with multiple associations" do
+      [%{posts: [post1]} = t1, %{posts: [post2]}] = [thread_fixture(), thread_fixture()]
+
+      p1 =
+        %Janus.Policy{}
+        |> allow(:read, Thread, where: [archived: false])
+        |> allow(:read, User, where_not: [id: post2.author_id])
+        |> allow(:read, Post, where: [thread: allows(:read), author: allows(:read)])
+
+      assert {:ok, %Post{}} =
+               Auth.authorize(post1, :read, p1, load_associations: true, repo: Repo)
+
+      assert {:error, :not_authorized} =
+               Auth.authorize(post2, :read, p1, load_associations: true, repo: Repo)
+
+      assert [%Post{}] = Auth.scope(Post, :read, p1) |> Repo.all()
+
+      t1 |> Thread.changeset(%{archived: true}) |> Repo.update!()
+      post1 = Repo.preload(post1, [:author, :thread], force: true)
+
+      assert {:error, :not_authorized} =
+               Auth.authorize(post1, :read, p1, load_associations: true, repo: Repo)
+
+      assert [] = Auth.scope(Post, :read, p1) |> Repo.all()
+    end
+
+    test "allows/1 in allow/4 with nested associations" do
+      [%{posts: [post1]}, %{posts: [post2]}] = [thread_fixture(), thread_fixture()]
+
+      p1 =
+        %Janus.Policy{}
+        |> allow(:read, User, where_not: [id: post2.author_id])
+        |> allow(:read, Thread, where: [creator: allows(:read)])
+        |> allow(:read, Post, where: [thread: allows(:read)])
+
+      assert {:ok, %Post{}} =
+               Auth.authorize(post1, :read, p1, load_associations: true, repo: Repo)
+
+      assert {:error, :not_authorized} =
+               Auth.authorize(post2, :read, p1, load_associations: true, repo: Repo)
+
+      assert [%Post{}] = Auth.scope(Post, :read, p1) |> Repo.all()
     end
 
     test "allows/1 in deny/4" do
