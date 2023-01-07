@@ -186,10 +186,10 @@ defmodule Janus.Authorization do
   def scope(query_or_schema, action, policy, opts \\ []) do
     case Policy.run_hooks(:scope, query_or_schema, action, policy) do
       {:cont, query_or_schema} ->
-        Filter.filter(query_or_schema, action, policy, opts)
+        Filter.filter_query(query_or_schema, action, policy, opts)
 
       :halt ->
-        Filter.filter(query_or_schema, action, %Janus.Policy{}, opts)
+        Filter.filter_query(query_or_schema, action, %Janus.Policy{}, opts)
     end
   end
 

@@ -570,7 +570,7 @@ defmodule Janus.AuthorizationTest do
       assert [] = Auth.scope(Post, :read, p1) |> Repo.all()
     end
 
-    test "allows/1 in allow/4 with nested associations" do
+    test "allows/1 in allow/4 with chained associations" do
       [%{posts: [post1]}, %{posts: [post2]}] = [thread_fixture(), thread_fixture()]
 
       p1 =
@@ -578,6 +578,23 @@ defmodule Janus.AuthorizationTest do
         |> allow(:read, User, where_not: [id: post2.author_id])
         |> allow(:read, Thread, where: [creator: allows(:read)])
         |> allow(:read, Post, where: [thread: allows(:read)])
+
+      assert {:ok, %Post{}} =
+               Auth.authorize(post1, :read, p1, load_associations: true, repo: Repo)
+
+      assert {:error, :not_authorized} =
+               Auth.authorize(post2, :read, p1, load_associations: true, repo: Repo)
+
+      assert [%Post{}] = Auth.scope(Post, :read, p1) |> Repo.all()
+    end
+
+    test "allows/1 in allow/4 with nested associations" do
+      [%{posts: [post1]}, %{posts: [post2]}] = [thread_fixture(), thread_fixture()]
+
+      p1 =
+        %Janus.Policy{}
+        |> allow(:read, User, where_not: [id: post2.author_id])
+        |> allow(:read, Post, where: [thread: [creator: allows(:read)]])
 
       assert {:ok, %Post{}} =
                Auth.authorize(post1, :read, p1, load_associations: true, repo: Repo)
@@ -626,6 +643,25 @@ defmodule Janus.AuthorizationTest do
       assert_raise ArgumentError, message, fn ->
         Auth.scope(from("threads"), :read, policy)
       end
+    end
+
+    test "should retain existing clauses from the given query" do
+      policy =
+        %Janus.Policy{}
+        |> allow(:read, Thread, where: [archived: false])
+        |> allow(:read, Post, where: [thread: allows(:read)])
+
+      [t1 | _] = for i <- 1..5, do: thread_fixture(%{title: "#{i}"})
+      t1 |> Thread.changeset(%{archived: true}) |> Repo.update!()
+
+      query =
+        from(t in Thread,
+          where: t.title in ["1", "2"],
+          join: c in assoc(t, :creator),
+          preload: [creator: c]
+        )
+
+      assert [%Thread{creator: %User{}}] = Auth.scope(query, :read, policy) |> Repo.all()
     end
   end
 

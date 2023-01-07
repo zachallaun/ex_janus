@@ -7,146 +7,96 @@ defmodule Janus.Authorization.Filter do
 
   @root_binding :__object__
 
-  defstruct [:policy, :action, :schema, :binding, :parent_binding, :dynamic, joins: []]
+  defstruct [:policy, :action, :schema, :binding, :dynamic, joins: []]
 
   @type t :: %Filter{
           policy: Janus.Policy.t(),
           action: Janus.action(),
           schema: Janus.schema_module(),
           binding: atom(),
-          parent_binding: atom(),
           dynamic: Ecto.Query.dynamic(),
           joins: keyword()
         }
 
   @doc """
-  Converts a `%Filter{}` struct into an `%Ecto.Query{}`
+  Filters a queryable to those authorized by the policy.
 
   ## Options
 
-  * `:query` - initial query to build off of (defaults to `filter.struct`)
   * `:preload_authorized` - preload associated resources, filtering them
     using the same policy and action present on the filter
   """
-  def to_query(%Filter{} = filter, opts \\ []) do
-    %{
-      schema: schema,
-      binding: binding,
-      dynamic: dynamic,
-      joins: joins
-    } = filter
-
-    initial_query = Keyword.get(opts, :query, schema)
-
-    from(initial_query, as: ^binding, where: ^dynamic)
-    |> with_joins(joins)
-    |> with_preload_authorized(filter, opts[:preload_authorized])
-  end
-
-  @doc """
-  Filters a query using action and policy.
-  """
-  def filter(query_or_schema, action, policy, opts \\ []) do
-    {query, schema} = Janus.Utils.resolve_query_and_schema!(query_or_schema)
+  def filter_query(queryable, action, policy, opts \\ []) do
+    {query, schema} = Janus.Utils.resolve_query_and_schema!(queryable)
     rule = Janus.Policy.rule_for(policy, action, schema)
 
-    base_filter = %Filter{
+    root_filter = %Filter{
+      dynamic: false,
+      binding: @root_binding,
       policy: policy,
       action: action,
-      schema: schema,
-      dynamic: false,
-      binding: @root_binding
+      schema: schema
     }
 
-    allowed = with_conditions(base_filter, rule.allow)
-    denied = with_conditions(base_filter, rule.deny)
+    allowed = combine_all(root_filter, :or, rule.allow, &apply_condition/2)
+    denied = combine_all(root_filter, :or, rule.deny, &apply_condition/2)
+    filter = combine(allowed, :and_not, denied)
 
-    combine(allowed, :and_not, denied)
-    |> to_query(Keyword.put(opts, :query, query))
+    from(query, as: ^filter.binding, where: ^filter.dynamic)
+    |> with_joins(filter)
+    |> with_preloads(filter, opts[:preload_authorized])
   end
 
-  defp with_conditions(filter, conditions) do
-    for condition <- conditions, reduce: filter do
-      filter ->
-        f = apply_condition(condition, filter)
-        combine(filter, :or, f)
-    end
+  defp combine_all(filter, op, items, fun) do
+    Enum.reduce(items, filter, fn item, filter ->
+      combine(filter, op, fun.(filter, item))
+    end)
   end
 
   defp combine(f1, op, f2) do
+    dynamic =
+      case op do
+        :and -> dynamic_and(f1.dynamic, f2.dynamic)
+        :or -> dynamic_or(f1.dynamic, f2.dynamic)
+        :and_not -> dynamic_and(f1.dynamic, dynamic_not(f2.dynamic))
+      end
+
     f1
-    |> Map.put(:dynamic, combine_dynamic(f1.dynamic, op, f2.dynamic))
-    |> Map.put(:joins, merge_joins(f1.joins, f2.joins))
+    |> Map.put(:dynamic, dynamic)
+    |> Map.put(:joins, Enum.uniq(f1.joins ++ f2.joins))
   end
 
-  defp with_joins(query, joins) do
-    for join <- joins, reduce: query do
-      query ->
-        case join do
-          {:__subquery__, {subquery, binding}} ->
-            from(query, join: s in subquery(subquery), on: as(^binding).id == s.id)
-
-          {assoc, binding} ->
-            from([{^binding, x}] in query, join: assoc(x, ^assoc), as: ^assoc)
-        end
-    end
+  defp apply_condition(filter, conditions) when is_list(conditions) do
+    combine_all(%{filter | dynamic: true}, :and, conditions, &apply_condition/2)
   end
 
-  defp combine_dynamic(d1, :and, d2), do: simplify_and(d1, d2)
-  defp combine_dynamic(d1, :or, d2), do: simplify_or(d1, d2)
-  defp combine_dynamic(d1, :and_not, d2), do: simplify_and(d1, simplify_not(d2))
-
-  defp merge_joins(j1, j2), do: Enum.uniq(j1 ++ j2)
-
-  defp apply_condition({:where, clause}, filter) do
-    apply_clause(clause, filter)
+  defp apply_condition(filter, {:where, clause}) do
+    apply_filter_clause(filter, clause)
   end
 
-  defp apply_condition({:where_not, clause}, filter) do
-    %{dynamic: dynamic} = filter = apply_clause(clause, filter)
-    %{filter | dynamic: simplify_not(dynamic)}
+  defp apply_condition(filter, {:where_not, clause}) do
+    filter
+    |> apply_filter_clause(clause)
+    |> Map.update!(:dynamic, &dynamic_not/1)
   end
 
-  defp apply_condition({:or, cond1, conditions}, filter) do
-    %{dynamic: d1} = filter = apply_condition(cond1, filter)
-    %{dynamic: d2} = filter = apply_condition(conditions, filter)
-    %{filter | dynamic: simplify_or(d1, d2)}
+  defp apply_condition(filter, {:or, first, second}) do
+    combine(apply_condition(filter, first), :or, apply_condition(filter, second))
   end
 
-  defp apply_condition([], filter) do
-    %{filter | dynamic: true}
+  defp apply_filter_clause(filter, clauses) when is_list(clauses) do
+    combine_all(filter, :and, clauses, &apply_filter_clause/2)
   end
 
-  defp apply_condition(conditions, filter) when is_list(conditions) do
-    for condition <- conditions, reduce: %{filter | dynamic: true} do
-      filter ->
-        f = apply_condition(condition, filter)
-        combine(filter, :and, f)
-    end
+  defp apply_filter_clause(filter, {:__derived__, :allow, action}) do
+    subquery = filter_query(filter.schema, action, filter.policy)
+    %{filter | joins: filter.joins ++ [__subquery__: {subquery, filter.binding}]}
   end
 
-  defp apply_clause(clauses, filter) when is_list(clauses) do
-    for clause <- clauses, reduce: filter do
-      filter ->
-        f = apply_clause(clause, filter)
-        combine(filter, :and, f)
-    end
-  end
-
-  defp apply_clause({:__derived__, :allow, action}, filter) do
-    subquery = filter(filter.schema, action, filter.policy)
-    %{filter | joins: merge_joins(filter.joins, __subquery__: {subquery, filter.binding})}
-  end
-
-  defp apply_clause({field, value}, filter) do
-    if schema = associated_schema(filter, field) do
-      apply_clause(value, %{
-        filter
-        | schema: schema,
-          binding: field,
-          parent_binding: filter.binding,
-          joins: [{field, filter.binding}]
-      })
+  defp apply_filter_clause(filter, {field, value}) do
+    if schema = association_schema(filter, field) do
+      inner = %{filter | schema: schema, binding: field, joins: [{field, filter.binding}]}
+      apply_filter_clause(inner, value)
     else
       %{filter | dynamic: dynamic_compare(filter, field, value)}
     end
@@ -186,113 +136,119 @@ defmodule Janus.Authorization.Filter do
     Ecto.Type.dump(type, value)
   end
 
-  defp associated_schema(%Filter{} = filter, field) do
-    associated_schema(filter.schema, field)
-  end
-
-  defp associated_schema(schema, field) when is_atom(schema) do
+  defp association_schema(%Filter{schema: schema}, field) do
     case schema.__schema__(:association, field) do
       nil -> nil
       assoc -> assoc.related
     end
   end
 
-  defp simplify_and(false, _), do: false
-  defp simplify_and(_, false), do: false
-  defp simplify_and(true, clause), do: clause
-  defp simplify_and(clause, true), do: clause
-  defp simplify_and(clause1, clause2), do: dynamic(^clause1 and ^clause2)
+  defp dynamic_and(false, _), do: false
+  defp dynamic_and(_, false), do: false
+  defp dynamic_and(true, clause), do: clause
+  defp dynamic_and(clause, true), do: clause
+  defp dynamic_and(clause1, clause2), do: dynamic(^clause1 and ^clause2)
 
-  defp simplify_or(true, _), do: true
-  defp simplify_or(_, true), do: true
-  defp simplify_or(false, clause), do: clause
-  defp simplify_or(clause, false), do: clause
-  defp simplify_or(clause1, clause2), do: dynamic(^clause1 or ^clause2)
+  defp dynamic_or(true, _), do: true
+  defp dynamic_or(_, true), do: true
+  defp dynamic_or(false, clause), do: clause
+  defp dynamic_or(clause, false), do: clause
+  defp dynamic_or(clause1, clause2), do: dynamic(^clause1 or ^clause2)
 
-  defp simplify_not(true), do: false
-  defp simplify_not(false), do: true
-  defp simplify_not(clause), do: dynamic(not (^clause))
+  defp dynamic_not(true), do: false
+  defp dynamic_not(false), do: true
+  defp dynamic_not(clause), do: dynamic(not (^clause))
 
-  defp with_preload_authorized(query, _filter, nil), do: query
+  defp with_joins(query, %Filter{joins: joins}) do
+    for join <- joins, reduce: query do
+      query ->
+        case join do
+          {:__subquery__, {subquery, binding}} ->
+            from(query, join: s in subquery(subquery), on: as(^binding).id == s.id)
 
-  defp with_preload_authorized(query, filter, preload_opt) do
-    {preloads, preload_opt} = calc_preloads(preload_opt, filter.schema, filter.binding, filter)
-
-    query =
-      for preload <- preloads, reduce: query do
-        query ->
-          from([{^preload.owner_as, r}] in query,
-            left_lateral_join:
-              lateral in subquery(
-                from(
-                  a in preload.related_filtered,
-                  where:
-                    field(a, ^preload.related_key) ==
-                      field(parent_as(^preload.owner_as), ^preload.owner_key),
-                  select: %{id: a.id, lateral_selected: true}
-                )
-              ),
-            left_join: a in assoc(r, ^preload.assoc),
-            as: ^preload.related_as,
-            on: a.id == lateral.id
-          )
-      end
-
-    from(query, preload: ^preload_opt)
+          {assoc, binding} ->
+            from([{^binding, x}] in query, join: assoc(x, ^assoc), as: ^assoc)
+        end
+    end
   end
 
-  defp calc_preloads(assoc, schema, binding, filter) when is_atom(assoc) do
-    {preload, preload_opt} = preload_spec(assoc, schema, binding, filter)
-    {[preload], preload_opt}
+  defp with_preloads(query, _filter, nil), do: query
+
+  defp with_preloads(query, filter, preload_opt) do
+    %{schema: schema, action: action, policy: policy, binding: binding} = filter
+    {preloads, preload_opt} = calc_preloads(preload_opt, {schema, action, policy, binding})
+
+    preloads
+    |> Enum.reduce(query, fn preload, query ->
+      lateral_query =
+        from(
+          a in preload.related_filtered,
+          where:
+            field(a, ^preload.related_key) ==
+              field(parent_as(^preload.owner_as), ^preload.owner_key),
+          select: %{id: a.id}
+        )
+
+      from([{^preload.owner_as, r}] in query,
+        left_lateral_join: lateral in subquery(lateral_query),
+        left_join: a in assoc(r, ^preload.assoc),
+        as: ^preload.related_as,
+        on: a.id == lateral.id
+      )
+    end)
+    |> from(preload: ^preload_opt)
   end
 
-  defp calc_preloads({assoc, %Ecto.Query{} = query}, schema, binding, filter) do
-    {preload, preload_opt} = preload_spec(assoc, schema, binding, filter, query)
-    {[preload], preload_opt}
+  defp calc_preloads(assoc, filter_info) when is_atom(assoc) do
+    preload_spec(assoc, filter_info, nil)
   end
 
-  defp calc_preloads({assoc, {%Ecto.Query{} = query, rest}}, schema, binding, filter) do
-    nested_preload_spec({assoc, rest}, schema, binding, filter, query)
+  defp calc_preloads({assoc, %Ecto.Query{} = query}, filter_info) do
+    preload_spec(assoc, filter_info, query)
   end
 
-  defp calc_preloads({assoc, rest}, schema, binding, filter) do
-    nested_preload_spec({assoc, rest}, schema, binding, filter, nil)
+  defp calc_preloads({assoc, {%Ecto.Query{} = query, rest}}, filter_info) do
+    nested_preload_spec({assoc, rest}, filter_info, query)
   end
 
-  defp calc_preloads(preloads, schema, binding, filter) when is_list(preloads) do
+  defp calc_preloads({assoc, rest}, filter_info) do
+    nested_preload_spec({assoc, rest}, filter_info, nil)
+  end
+
+  defp calc_preloads(preloads, filter_info) when is_list(preloads) do
     {preloads, preload_opts} =
       preloads
-      |> Enum.map(&calc_preloads(&1, schema, binding, filter))
+      |> Enum.map(&calc_preloads(&1, filter_info))
       |> Enum.unzip()
 
     {Enum.concat(preloads), Enum.concat(preload_opts)}
   end
 
-  defp nested_preload_spec({assoc, rest}, schema, binding, filter, related_query) do
+  defp nested_preload_spec({assoc, rest}, {schema, action, policy, binding}, related_query) do
     related_schema = schema.__schema__(:association, assoc).related
 
-    {preload, [{assoc, dynamic}]} = preload_spec(assoc, schema, binding, filter, related_query)
+    {[preload], [{assoc, dynamic}]} =
+      preload_spec(assoc, {schema, action, policy, binding}, related_query)
 
     {rest_preloads, rest_preload_opt} =
-      calc_preloads(rest, related_schema, preload.related_as, filter)
+      calc_preloads(rest, {related_schema, action, policy, preload.related_as})
 
     {[preload | rest_preloads], [{assoc, {dynamic, rest_preload_opt}}]}
   end
 
-  defp preload_spec(assoc, schema, binding, filter, related_query \\ nil) do
+  defp preload_spec(assoc, {schema, action, policy, binding}, related_query) do
     association = schema.__schema__(:association, assoc)
-    related_query = related_query || association.queryable
     related_as = :"#{assoc}_preload"
 
     preload = %{
       assoc: assoc,
       owner_as: binding,
       owner_key: association.owner_key,
-      related_filtered: filter(related_query, filter.action, filter.policy),
+      related_filtered: filter_query(related_query || association.queryable, action, policy),
       related_as: related_as,
       related_key: association.related_key
     }
 
-    {preload, [{assoc, dynamic([{^related_as, a}], a)}]}
+    {[preload], [{assoc, dynamic([{^related_as, a}], a)}]}
   end
 end
