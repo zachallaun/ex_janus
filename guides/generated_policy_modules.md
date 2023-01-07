@@ -36,7 +36,7 @@ The following helpers are included in newly-generated policy modules:
 
 * `authorized_delete` - wraps `c:Ecto.Repo.delete/2`, deletes the given resource if it is authorized for the given action/user
 
-* `validate_authorized` - changeset validation that can ensure the resource is authorized both prior to and after applying changes (used by other helpers that operate on a changeset)
+* `validate_authorized` - changeset validation that ensures the resource being changed is authorized, adding a validation error otherwise.
 
 We'll go over each of these and how they might be used in the sections that follow.
 
@@ -86,9 +86,9 @@ iex> Policy.authorized_fetch_all(Post, authorize: {:read, user})
 {:error, :not_authorized}
 ```
 
-A tuple is returned here for the same reason: to differentiate between an empty result due to the query conditions or an authorization failure.
+A tuple is also returned here to differentiate authorization failures and an empty result.
 
-Like `Repo.all`, an Ecto query can also be passed in:
+An Ecto query can also be passed as the first argument.
 
 ```elixir
 iex> query = from p in Post, where: p.inserted_at > ago(1, "month")
