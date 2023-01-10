@@ -66,9 +66,9 @@ If you're reading this on GitHub, head over to the [HexDocs](https://hexdocs.pm/
 
 If you're already on HexDocs, here's where you might head next:
 
-- `Janus` module docs
-- [The Basics](basics.html) cheatsheet
-- [Generated Policy Modules](generated_policy_modules.html) - ideas behind `mix janus.gen.policy`
+- [`Janus` module docs](https://hexdocs.pm/ex_janus/Janus.html)
+- [The Basics](https://hexdocs.pm/ex_janus/basics.html) cheatsheet
+- [Generated Policy Modules](https://hexdocs.pm/ex_janus/generated_policy_modules.html) - ideas behind `mix janus.gen.policy`
 
 ## Development
 
