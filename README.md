@@ -62,9 +62,7 @@ And thus, Janus was born.
 
 ## Documentation
 
-If you're reading this on GitHub, head over to the [HexDocs](https://hexdocs.pm/ex_janus/Janus.html).
-
-If you're already on HexDocs, here's where you might head next:
+Here are a few places to get started:
 
 - [`Janus` module docs](https://hexdocs.pm/ex_janus/Janus.html)
 - [The Basics](https://hexdocs.pm/ex_janus/basics.html) cheatsheet
