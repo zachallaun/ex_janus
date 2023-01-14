@@ -133,6 +133,32 @@ defmodule Janus.PolicyTest do
       assert {:ok, ^t2} = Auth.authorize(t2, :edit, p2)
       assert [%{id: ^t2_id}] = Auth.scope(Thread, :edit, p2) |> Repo.all()
     end
+
+    test "raises if given a module that isn't a schema" do
+      message = fn name ->
+        "received invalid module #{name}, expected a module defined using Ecto.Schema"
+      end
+
+      assert_raise ArgumentError, message.("NotDefined"), fn ->
+        %Janus.Policy{}
+        |> allow(:read, NotDefined)
+      end
+
+      assert_raise ArgumentError, message.("NotDefined"), fn ->
+        %Janus.Policy{}
+        |> deny(:read, NotDefined)
+      end
+
+      assert_raise ArgumentError, message.(":foo"), fn ->
+        %Janus.Policy{}
+        |> deny(:read, :foo)
+      end
+
+      assert_raise ArgumentError, message.("1"), fn ->
+        %Janus.Policy{}
+        |> deny(:read, 1)
+      end
+    end
   end
 
   describe "hooks" do

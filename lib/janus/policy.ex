@@ -246,6 +246,8 @@ defmodule Janus.Policy do
   end
 
   def allow(%Policy{} = policy, action, schema, opts) do
+    validate_schema!(schema)
+
     policy
     |> rule_for(action, schema)
     |> Rule.allow(opts)
@@ -273,10 +275,23 @@ defmodule Janus.Policy do
   end
 
   def deny(%Policy{} = policy, action, schema, opts) do
+    validate_schema!(schema)
+
     policy
     |> rule_for(action, schema)
     |> Rule.deny(opts)
     |> put_rule(policy)
+  end
+
+  defp validate_schema!(schema) when is_atom(schema) do
+    function_exported?(schema, :__schema__, 1) || invalid_schema!(schema)
+  end
+
+  defp validate_schema!(other), do: invalid_schema!(other)
+
+  defp invalid_schema!(invalid) do
+    raise ArgumentError,
+          "received invalid module #{inspect(invalid)}, expected a module defined using Ecto.Schema"
   end
 
   @doc """
