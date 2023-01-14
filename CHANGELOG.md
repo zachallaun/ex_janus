@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.1 (2023-01-14)
+
+### Enhancements
+
+  * [Janus.Policy] Raise if something other than a schema is passed to `allow/4` or `deny/4`
+
 ## v0.2.0 (2023-01-05)
 
 ### Enhancements
