@@ -11,7 +11,7 @@ defmodule Janus.AuthorizationTest do
 
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread)
+        |> allow(Thread, :read)
 
       query = from(Thread, limit: 1)
 
@@ -27,7 +27,7 @@ defmodule Janus.AuthorizationTest do
     test "should check whether any permissions might authorize the action" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread)
+        |> allow(Thread, :read)
 
       assert Auth.any_authorized?(Thread, :read, policy)
       refute Auth.any_authorized?(Thread, :edit, policy)
@@ -37,15 +37,15 @@ defmodule Janus.AuthorizationTest do
     test "should return false if a blanket deny exists" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread)
-        |> deny(:read, Thread)
+        |> allow(Thread, :read)
+        |> deny(Thread, :read)
 
       refute Auth.any_authorized?(Thread, :read, policy)
 
       policy =
         %Janus.Policy{}
-        |> deny(:read, Thread)
-        |> allow(:read, Thread)
+        |> deny(Thread, :read)
+        |> allow(Thread, :read)
 
       refute Auth.any_authorized?(Thread, :read, policy)
     end
@@ -53,8 +53,8 @@ defmodule Janus.AuthorizationTest do
     test "should return true if a deny is conditional on an unmatched attribute" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread)
-        |> deny(:read, Thread, where: [archived: true])
+        |> allow(Thread, :read)
+        |> deny(Thread, :read, where: [archived: true])
 
       assert Auth.any_authorized?(Thread, :read, policy)
     end
@@ -71,8 +71,8 @@ defmodule Janus.AuthorizationTest do
     test "should allow specified actions and deny all others" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread)
-        |> allow(:read, Post)
+        |> allow(Thread, :read)
+        |> allow(Post, :read)
 
       thread = thread_fixture()
       [post] = thread.posts
@@ -87,8 +87,8 @@ defmodule Janus.AuthorizationTest do
     test "should override allow with deny" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread)
-        |> deny(:read, Thread)
+        |> allow(Thread, :read)
+        |> deny(Thread, :read)
 
       thread = thread_fixture()
 
@@ -99,8 +99,8 @@ defmodule Janus.AuthorizationTest do
     test "should override conditional allows" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread, where: [id: 0])
-        |> allow(:read, Thread)
+        |> allow(Thread, :read, where: [id: 0])
+        |> allow(Thread, :read)
 
       thread = thread_fixture()
 
@@ -113,7 +113,7 @@ defmodule Janus.AuthorizationTest do
     test "should allow action if :where attribute matches" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread, where: [archived: false])
+        |> allow(Thread, :read, where: [archived: false])
 
       unarchived = thread_fixture()
       archived = thread_fixture() |> Thread.changeset(%{archived: true}) |> Repo.update!()
@@ -127,7 +127,7 @@ defmodule Janus.AuthorizationTest do
     test "should allow action if :where_not attribute doesn't match" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread, where_not: [archived: true])
+        |> allow(Thread, :read, where_not: [archived: true])
 
       thread = thread_fixture()
 
@@ -138,7 +138,7 @@ defmodule Janus.AuthorizationTest do
     test "should allow action if multiple :where attributes match" do
       build_policy = fn user ->
         %Janus.Policy{}
-        |> allow(:edit, Thread, where: [archived: false, creator_id: user.id])
+        |> allow(Thread, :edit, where: [archived: false, creator_id: user.id])
       end
 
       [user1, user2] = [user_fixture(), user_fixture()]
@@ -157,7 +157,7 @@ defmodule Janus.AuthorizationTest do
 
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread, where: [archived: false], where_not: [id: unreadable.id])
+        |> allow(Thread, :read, where: [archived: false], where_not: [id: unreadable.id])
 
       assert {:ok, ^readable} = Auth.authorize(readable, :read, policy)
       assert {:error, :not_authorized} = Auth.authorize(unreadable, :read, policy)
@@ -168,8 +168,8 @@ defmodule Janus.AuthorizationTest do
     test "should deny action if an allow is overriden" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread)
-        |> deny(:read, Thread, where: [archived: true])
+        |> allow(Thread, :read)
+        |> deny(Thread, :read, where: [archived: true])
 
       %{id: thread_id} = thread = thread_fixture()
 
@@ -187,7 +187,7 @@ defmodule Janus.AuthorizationTest do
     test "should dump values to the correct underlying type" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, User, where: [status: :active])
+        |> allow(User, :read, where: [status: :active])
 
       [%{id: u1_id} = u1, u2] = [user_fixture(), user_fixture()]
       {:ok, u2} = u2 |> User.changeset(%{status: :banned}) |> Repo.update()
@@ -200,7 +200,7 @@ defmodule Janus.AuthorizationTest do
     test "should allow comparisons to nil" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread, where: [category: nil])
+        |> allow(Thread, :read, where: [category: nil])
 
       %{id: allowed_id} = allowed = thread_fixture()
       not_allowed = thread_fixture(%{category: "anything"})
@@ -214,7 +214,7 @@ defmodule Janus.AuthorizationTest do
     test "should raise on filter if field value cannot be dumped to expected type" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread, where: [archived: "foo"])
+        |> allow(Thread, :read, where: [archived: "foo"])
 
       message = ~r(could not dump "foo" to type :boolean)
 
@@ -228,7 +228,7 @@ defmodule Janus.AuthorizationTest do
     test "can be used for attribute comparison" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread,
+        |> allow(Thread, :read,
           where: [
             archived: fn
               :boolean, record, :archived ->
@@ -251,7 +251,7 @@ defmodule Janus.AuthorizationTest do
     test "can be used for association attribute comparison" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, Post,
+        |> allow(Post, :read,
           where: [
             thread: [
               archived: fn
@@ -279,7 +279,7 @@ defmodule Janus.AuthorizationTest do
     test "raise if incorrect arity is given" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread, where: [archived: fn -> :boom end])
+        |> allow(Thread, :read, where: [archived: fn -> :boom end])
 
       thread = thread_fixture()
 
@@ -299,7 +299,7 @@ defmodule Janus.AuthorizationTest do
     test "should allow action if associated :where attribute matches" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, Post, where: [thread: [archived: false]])
+        |> allow(Post, :read, where: [thread: [archived: false]])
 
       post = post_fixture()
 
@@ -318,7 +318,7 @@ defmodule Janus.AuthorizationTest do
 
       policy =
         %Janus.Policy{}
-        |> allow(:edit, Post, where: [thread: [creator: [id: user.id]]])
+        |> allow(Post, :edit, where: [thread: [creator: [id: user.id]]])
 
       %{posts: [post]} = thread_fixture(%{creator_id: user.id})
       post = Repo.preload(post, thread: :creator)
@@ -328,7 +328,7 @@ defmodule Janus.AuthorizationTest do
     end
 
     test "raise if a required association is not loaded" do
-      policy = allow(%Janus.Policy{}, :read, Thread, where: [creator: [id: 1]])
+      policy = allow(%Janus.Policy{}, Thread, :read, where: [creator: [id: 1]])
 
       thread = thread_fixture()
       thread = Ecto.reset_fields(thread, [:creator])
@@ -341,7 +341,7 @@ defmodule Janus.AuthorizationTest do
     test "load required associations if `:repo` and `:load_associations` are set" do
       user = user_fixture()
       thread = thread_fixture(%{creator_id: user.id})
-      policy = allow(%Janus.Policy{}, :read, Thread, where: [creator: [id: user.id]])
+      policy = allow(%Janus.Policy{}, Thread, :read, where: [creator: [id: user.id]])
 
       thread = Ecto.reset_fields(thread, [:creator])
 
@@ -360,7 +360,7 @@ defmodule Janus.AuthorizationTest do
 
       policy =
         %Janus.Policy{}
-        |> allow(:read, Post, where: [thread: [creator: [id: user.id]]])
+        |> allow(Post, :read, where: [thread: [creator: [id: user.id]]])
 
       post = Ecto.reset_fields(post, [:thread])
 
@@ -378,7 +378,7 @@ defmodule Janus.AuthorizationTest do
 
       p1 =
         %Janus.Policy{}
-        |> allow(:read, Thread,
+        |> allow(Thread, :read,
           where: [archived: false],
           where_not: [creator: [id: t1.creator_id]]
         )
@@ -389,7 +389,7 @@ defmodule Janus.AuthorizationTest do
 
       p2 =
         %Janus.Policy{}
-        |> allow(:read, Thread,
+        |> allow(Thread, :read,
           where: [archived: false],
           where_not: [creator: [id: t1.creator_id]],
           where_not: [creator: [id: t2.creator_id]]
@@ -405,7 +405,7 @@ defmodule Janus.AuthorizationTest do
 
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread, where: [archived: false], or_where: [creator: [id: t.creator_id]])
+        |> allow(Thread, :read, where: [archived: false], or_where: [creator: [id: t.creator_id]])
 
       assert {:ok, ^t} = Auth.authorize(t, :read, policy)
       assert [%Thread{}] = Auth.scope(Thread, :read, policy) |> Repo.all()
@@ -428,8 +428,8 @@ defmodule Janus.AuthorizationTest do
     test "should only load authorized associations" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread, where: [archived: false])
-        |> allow(:read, Post, where: [archived: false])
+        |> allow(Thread, :read, where: [archived: false])
+        |> allow(Post, :read, where: [archived: false])
 
       query =
         Post
@@ -449,7 +449,7 @@ defmodule Janus.AuthorizationTest do
     test "shouldn't exclude records with empty preloads" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, User)
+        |> allow(User, :read)
 
       query = Auth.scope(User, :read, policy, preload_authorized: :threads)
 
@@ -459,8 +459,8 @@ defmodule Janus.AuthorizationTest do
     test "should load nested preloads" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread, where: [archived: false])
-        |> allow(:read, Post, where: [archived: false, thread: allows(:read)])
+        |> allow(Thread, :read, where: [archived: false])
+        |> allow(Post, :read, where: [archived: false, thread: allows(:read)])
 
       query = Auth.scope(Post, :read, policy, preload_authorized: [thread: :posts])
 
@@ -475,8 +475,8 @@ defmodule Janus.AuthorizationTest do
     test ":preload_authorized should accept a query to filter preloads" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread, where: [archived: false])
-        |> allow(:read, Post, where: [archived: false, thread: allows(:read)])
+        |> allow(Thread, :read, where: [archived: false])
+        |> allow(Post, :read, where: [archived: false, thread: allows(:read)])
 
       first_post_query = from(Post, order_by: :id, limit: 1)
 
@@ -491,9 +491,9 @@ defmodule Janus.AuthorizationTest do
     test ":preload_authorized should accept queries to filter nested preloads" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, User)
-        |> allow(:read, Thread, where: [archived: false])
-        |> allow(:read, Post, where: [archived: false, thread: allows(:read)])
+        |> allow(User, :read)
+        |> allow(Thread, :read, where: [archived: false])
+        |> allow(Post, :read, where: [archived: false, thread: allows(:read)])
 
       first_thread_query = from(Thread, order_by: :id, limit: 1)
       first_post_query = from(Post, order_by: :id, limit: 1)
@@ -516,8 +516,8 @@ defmodule Janus.AuthorizationTest do
     test "allows/1 in allow/4" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread, where: [archived: false])
-        |> allow(:edit, Thread, where: allows(:read))
+        |> allow(Thread, :read, where: [archived: false])
+        |> allow(Thread, :edit, where: allows(:read))
 
       thread = thread_fixture()
 
@@ -535,8 +535,8 @@ defmodule Janus.AuthorizationTest do
     test "allows/1 in allow/4 with associations" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread, where: [archived: false])
-        |> allow(:read, Post, where: [thread: allows(:read)])
+        |> allow(Thread, :read, where: [archived: false])
+        |> allow(Post, :read, where: [thread: allows(:read)])
 
       post = post_fixture()
 
@@ -549,9 +549,9 @@ defmodule Janus.AuthorizationTest do
 
       p1 =
         %Janus.Policy{}
-        |> allow(:read, Thread, where: [archived: false])
-        |> allow(:read, User, where_not: [id: post2.author_id])
-        |> allow(:read, Post, where: [thread: allows(:read), author: allows(:read)])
+        |> allow(Thread, :read, where: [archived: false])
+        |> allow(User, :read, where_not: [id: post2.author_id])
+        |> allow(Post, :read, where: [thread: allows(:read), author: allows(:read)])
 
       assert {:ok, %Post{}} =
                Auth.authorize(post1, :read, p1, load_associations: true, repo: Repo)
@@ -575,9 +575,9 @@ defmodule Janus.AuthorizationTest do
 
       p1 =
         %Janus.Policy{}
-        |> allow(:read, User, where_not: [id: post2.author_id])
-        |> allow(:read, Thread, where: [creator: allows(:read)])
-        |> allow(:read, Post, where: [thread: allows(:read)])
+        |> allow(User, :read, where_not: [id: post2.author_id])
+        |> allow(Thread, :read, where: [creator: allows(:read)])
+        |> allow(Post, :read, where: [thread: allows(:read)])
 
       assert {:ok, %Post{}} =
                Auth.authorize(post1, :read, p1, load_associations: true, repo: Repo)
@@ -593,8 +593,8 @@ defmodule Janus.AuthorizationTest do
 
       p1 =
         %Janus.Policy{}
-        |> allow(:read, User, where_not: [id: post2.author_id])
-        |> allow(:read, Post, where: [thread: [creator: allows(:read)]])
+        |> allow(User, :read, where_not: [id: post2.author_id])
+        |> allow(Post, :read, where: [thread: [creator: allows(:read)]])
 
       assert {:ok, %Post{}} =
                Auth.authorize(post1, :read, p1, load_associations: true, repo: Repo)
@@ -610,9 +610,9 @@ defmodule Janus.AuthorizationTest do
 
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread, where: [archived: false])
-        |> allow(:edit, Thread, where: [creator_id: thread.creator_id])
-        |> deny(:edit, Thread, where_not: allows(:read))
+        |> allow(Thread, :read, where: [archived: false])
+        |> allow(Thread, :edit, where: [creator_id: thread.creator_id])
+        |> deny(Thread, :edit, where_not: allows(:read))
 
       assert {:ok, ^thread} = Auth.authorize(thread, :read, policy)
       assert {:ok, ^thread} = Auth.authorize(thread, :edit, policy)
@@ -648,8 +648,8 @@ defmodule Janus.AuthorizationTest do
     test "should retain existing clauses from the given query" do
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread, where: [archived: false])
-        |> allow(:read, Post, where: [thread: allows(:read)])
+        |> allow(Thread, :read, where: [archived: false])
+        |> allow(Post, :read, where: [thread: allows(:read)])
 
       [t1 | _] = for i <- 1..5, do: thread_fixture(%{title: "#{i}"})
       t1 |> Thread.changeset(%{archived: true}) |> Repo.update!()
@@ -671,7 +671,7 @@ defmodule Janus.AuthorizationTest do
 
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread)
+        |> allow(Thread, :read)
         |> attach_hook(:preload_creator, Thread, fn
           :authorize, thread, :read ->
             {:cont, Repo.preload(thread, :creator)}
@@ -690,8 +690,8 @@ defmodule Janus.AuthorizationTest do
 
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread)
-        |> allow(:read, Post)
+        |> allow(Thread, :read)
+        |> allow(Post, :read)
         |> attach_hook(:do_halt, Thread, fn _, _, _ -> :halt end)
 
       assert {:error, :not_authorized} = Auth.authorize(thread, :read, policy)
@@ -706,7 +706,7 @@ defmodule Janus.AuthorizationTest do
 
       policy =
         %Janus.Policy{}
-        |> allow(:read, Thread)
+        |> allow(Thread, :read)
         |> attach_hook(:should_raise, fn _, _, _ -> :bad end)
 
       message = ~r"hook :should_raise returned an invalid result"

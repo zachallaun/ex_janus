@@ -41,9 +41,9 @@ defmodule Janus.Policy do
 
       def build_policy(policy, %User{role: :moderator} = user) do
         policy
-        |> allow(:edit, Comment, where: [user: [id: user.id]])
-        |> allow(:edit, Comment, where: [flagged_for_review: true])
-        |> deny(:edit, Comment, where: [user: [role: :admin]])
+        |> allow(Comment, :edit, where: [user: [id: user.id]])
+        |> allow(Comment, :edit, where: [flagged_for_review: true])
+        |> deny(Comment, :edit, where: [user: [role: :admin]])
       end
 
   While set of keyword options passed to `allow` and `deny` are
@@ -51,7 +51,7 @@ defmodule Janus.Policy do
   functions and not macros, there is no need to use the `^value` syntax
   used in Ecto. For example, the following would result in an error:
 
-      allow(policy, :edit, Comment, where: [user: [id: ^user.id]])
+      allow(policy, Comment, :edit, where: [user: [id: ^user.id]])
 
   ### `:where` and `:where_not` conditions
 
@@ -61,8 +61,8 @@ defmodule Janus.Policy do
 
       def build_policy(policy, %User{role: :moderator} = user) do
         policy
-        |> allow(:edit, Comment, where: [user_id: user.id])
-        |> allow(:edit, Comment,
+        |> allow(Comment, :edit, where: [user_id: user.id])
+        |> allow(Comment, :edit,
           where: [flagged_for_review: true],
           where_not: [user: [role: :admin]]
         )
@@ -80,7 +80,7 @@ defmodule Janus.Policy do
 
       def build_policy(policy, %User{role: :moderator} = user) do
         policy
-        |> allow(:edit, Comment,
+        |> allow(Comment, :edit,
           where: [flagged_for_review: true],
           where_not: [user: [role: :admin]],
           or_where: [user_id: user.id]
@@ -95,7 +95,7 @@ defmodule Janus.Policy do
   These clauses could be reordered to have a different meaning:
 
       policy
-      |> allow(:edit, Comment,
+      |> allow(Comment, :edit,
         where: [flagged_for_review: true],
         or_where: [user_id: user.id],
         where_not: [user: [role: :admin]]
@@ -116,7 +116,7 @@ defmodule Janus.Policy do
 
       def build_policy(policy, user) do
         policy
-        |> allow(:read, Post, where: [published_at: &in_the_past?/3])
+        |> allow(Comment, :read, where: [published_at: &in_the_past?/3])
       end
 
       def in_the_past?(:boolean, record, :published_at) do
@@ -233,19 +233,19 @@ defmodule Janus.Policy do
   ## Examples
 
       policy
-      |> allow(:read, FirstResource)
-      |> allow(:create, SecondResource, where: [creator: [id: user.id]])
+      |> allow(FirstResource, :read)
+      |> allow(SecondResource, :create, where: [creator: [id: user.id]])
   """
-  @spec allow(t, Janus.action() | [Janus.action()], Janus.schema_module(), keyword()) :: t
-  def allow(policy, action, schema, opts \\ [])
+  @spec allow(t, Janus.schema_module(), Janus.action() | [Janus.action()], keyword()) :: t
+  def allow(policy, schema, action, opts \\ [])
 
-  def allow(%Policy{} = policy, actions, schema, opts) when is_list(actions) do
+  def allow(%Policy{} = policy, schema, actions, opts) when is_list(actions) do
     Enum.reduce(actions, policy, fn action, policy ->
-      allow(policy, action, schema, opts)
+      allow(policy, schema, action, opts)
     end)
   end
 
-  def allow(%Policy{} = policy, action, schema, opts) do
+  def allow(%Policy{} = policy, schema, action, opts) do
     validate_schema!(schema)
 
     policy
@@ -262,19 +262,19 @@ defmodule Janus.Policy do
   ## Examples
 
       policy
-      |> allow(:read, FirstResource)
-      |> deny(:read, FirstResource, where: [scope: :private])
+      |> allow(FirstResource, :read)
+      |> deny(FirstResource, :read, where: [scope: :private])
   """
-  @spec deny(t, Janus.action(), Janus.schema_module(), keyword()) :: t
-  def deny(policy, action, schema, opts \\ [])
+  @spec deny(t, Janus.schema_module(), Janus.action() | [Janus.action()], keyword()) :: t
+  def deny(policy, schema, action, opts \\ [])
 
-  def deny(%Policy{} = policy, actions, schema, opts) when is_list(actions) do
+  def deny(%Policy{} = policy, schema, actions, opts) when is_list(actions) do
     Enum.reduce(actions, policy, fn action, policy ->
-      deny(policy, action, schema, opts)
+      deny(policy, schema, action, opts)
     end)
   end
 
-  def deny(%Policy{} = policy, action, schema, opts) do
+  def deny(%Policy{} = policy, schema, action, opts) do
     validate_schema!(schema)
 
     policy
@@ -305,15 +305,15 @@ defmodule Janus.Policy do
   Allow users to edit any posts they can delete.
 
       policy
-      |> allow(:edit, Post, where: allows(:delete))
-      |> allow(:delete, Post, where: [user_id: user.id])
+      |> allow(Post, :edit, where: allows(:delete))
+      |> allow(Post, :delete, where: [user_id: user.id])
 
   Don't allow users to edit posts they can't read.
 
       policy
-      |> allow(:read, Post, where: [archived: false])
-      |> allow(:edit, Post, where: [user_id: user.id])
-      |> deny(:edit, Post, where_not: allows(:read))
+      |> allow(Post, :read, where: [archived: false])
+      |> allow(Post, :edit, where: [user_id: user.id])
+      |> deny(Post, :edit, where_not: allows(:read))
 
   ## Example with associations
 
@@ -322,15 +322,15 @@ defmodule Janus.Policy do
   To start, we can duplicate the condition:
 
       policy
-      |> allow(:read, Post, where: [archived: false])
-      |> allow(:read, Comment, where: [post: [archived: false]])
+      |> allow(Post, :read, where: [archived: false])
+      |> allow(Comment, :read, where: [post: [archived: false]])
 
   If we add additional clauses to the condition for posts, however, we
   will have to duplicate them for comments. We can use `allows` instead:
 
       policy
-      |> allow(:read, Post, where: [archived: false])
-      |> allow(:read, Comment, where: [post: allows(:read)])
+      |> allow(Post, :read, where: [archived: false])
+      |> allow(Comment, :read, where: [post: allows(:read)])
 
   Now let's say we add a feature that allows for draft posts, which
   should not be visible unless a `published_at` is set. We can modify
@@ -338,8 +338,8 @@ defmodule Janus.Policy do
   comments.
 
       policy
-      |> allow(:read, Post, where: [archived: false], where_not: [published_at: nil])
-      |> allow(:read, Comment, where: [post: allows(:read)])
+      |> allow(Post, :read, where: [archived: false], where_not: [published_at: nil])
+      |> allow(Comment, :read, where: [post: allows(:read)])
   """
   def allows(action), do: {:__derived__, :allow, action}
 

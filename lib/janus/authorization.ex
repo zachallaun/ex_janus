@@ -251,8 +251,8 @@ defmodule Janus.Authorization do
   # So if we consider the following:
   #
   #     policy
-  #     |> allow(:read, Thing, where: [some_field: :foo], where_not: [other_field: :bar])
-  #     |> allow(:read, Thing, where: [some_field: :baz])
+  #     |> allow(Thing, :read, where: [some_field: :foo], where_not: [other_field: :bar])
+  #     |> allow(Thing, :read, where: [some_field: :baz])
   #
   # This policy defines two conditions for reading Thing -- if one of
   # them matches, it allows reading. For a condition to match, all of

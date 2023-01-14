@@ -9,15 +9,15 @@ defmodule Janus.PolicyTest do
       message = "invalid options passed to `allow` or `deny`: `[:foo]`"
 
       assert_raise ArgumentError, message, fn ->
-        allow(%Janus.Policy{}, :read, Thread, foo: :bar)
+        allow(%Janus.Policy{}, Thread, :read, foo: :bar)
       end
 
       assert_raise ArgumentError, message, fn ->
-        allow(%Janus.Policy{}, :read, Thread, where: [archived: false], foo: :bar)
+        allow(%Janus.Policy{}, Thread, :read, where: [archived: false], foo: :bar)
       end
 
       assert_raise ArgumentError, message, fn ->
-        allow(%Janus.Policy{}, :read, Thread, [:foo])
+        allow(%Janus.Policy{}, Thread, :read, [:foo])
       end
     end
 
@@ -28,7 +28,7 @@ defmodule Janus.PolicyTest do
       # not archived or t1
       p1 =
         %Janus.Policy{}
-        |> allow(:read, Thread, where: [archived: false], or_where: [id: t1_id])
+        |> allow(Thread, :read, where: [archived: false], or_where: [id: t1_id])
 
       assert {:ok, ^t1} = Auth.authorize(t1, :read, p1)
       assert {:error, :not_authorized} = Auth.authorize(t2, :read, p1)
@@ -37,8 +37,8 @@ defmodule Janus.PolicyTest do
       # archived or not t2
       p2 =
         %Janus.Policy{}
-        |> allow(:read, Thread)
-        |> deny(:read, Thread, where: [archived: false], or_where: [id: t2_id])
+        |> allow(Thread, :read)
+        |> deny(Thread, :read, where: [archived: false], or_where: [id: t2_id])
 
       assert {:ok, ^t1} = Auth.authorize(t1, :read, p2)
       assert {:error, :not_authorized} = Auth.authorize(t2, :read, p2)
@@ -47,7 +47,7 @@ defmodule Janus.PolicyTest do
       # not archived or t1
       p3 =
         %Janus.Policy{}
-        |> allow(:read, Thread, where_not: [archived: true], or_where: [id: t1_id])
+        |> allow(Thread, :read, where_not: [archived: true], or_where: [id: t1_id])
 
       assert {:ok, ^t1} = Auth.authorize(t1, :read, p3)
       assert {:error, :not_authorized} = Auth.authorize(t2, :read, p3)
@@ -56,7 +56,7 @@ defmodule Janus.PolicyTest do
       # (not archived or t1) and not t1
       p4 =
         %Janus.Policy{}
-        |> allow(:read, Thread,
+        |> allow(Thread, :read,
           where: [archived: false],
           or_where: [id: t1_id],
           where_not: [id: t1_id]
@@ -69,7 +69,7 @@ defmodule Janus.PolicyTest do
       # (not archived or t1) or t2
       p5 =
         %Janus.Policy{}
-        |> allow(:read, Thread,
+        |> allow(Thread, :read,
           where: [archived: false],
           or_where: [id: t1_id],
           or_where: [id: t2_id]
@@ -82,7 +82,7 @@ defmodule Janus.PolicyTest do
       # (not archived and not t1) or t1
       p6 =
         %Janus.Policy{}
-        |> allow(:read, Thread,
+        |> allow(Thread, :read,
           where: [archived: false],
           where_not: [id: t1_id],
           or_where: [id: t1_id]
@@ -96,8 +96,8 @@ defmodule Janus.PolicyTest do
     test "should accept a list of actions" do
       policy =
         %Janus.Policy{}
-        |> allow([:read, :create], Thread)
-        |> deny([:read, :edit], Thread, where: [title: "denied"])
+        |> allow(Thread, [:read, :create])
+        |> deny(Thread, [:read, :edit], where: [title: "denied"])
 
       %{id: thread_id} = thread = thread_fixture()
 
@@ -119,7 +119,7 @@ defmodule Janus.PolicyTest do
 
       p1 =
         %Janus.Policy{}
-        |> allow(:edit, Thread, where: [archived: false], where: [creator_id: t1.creator_id])
+        |> allow(Thread, :edit, where: [archived: false], where: [creator_id: t1.creator_id])
 
       assert {:ok, ^t1} = Auth.authorize(t1, :edit, p1)
       assert {:error, :not_authorized} = Auth.authorize(t2, :edit, p1)
@@ -127,7 +127,7 @@ defmodule Janus.PolicyTest do
 
       p2 =
         %Janus.Policy{}
-        |> allow(:edit, Thread, where: [archived: false], where_not: [creator_id: t1.creator_id])
+        |> allow(Thread, :edit, where: [archived: false], where_not: [creator_id: t1.creator_id])
 
       assert {:error, :not_authorized} = Auth.authorize(t1, :edit, p2)
       assert {:ok, ^t2} = Auth.authorize(t2, :edit, p2)
@@ -141,22 +141,22 @@ defmodule Janus.PolicyTest do
 
       assert_raise ArgumentError, message.("NotDefined"), fn ->
         %Janus.Policy{}
-        |> allow(:read, NotDefined)
+        |> allow(NotDefined, :read)
       end
 
       assert_raise ArgumentError, message.("NotDefined"), fn ->
         %Janus.Policy{}
-        |> deny(:read, NotDefined)
+        |> deny(NotDefined, :read)
       end
 
       assert_raise ArgumentError, message.(":foo"), fn ->
         %Janus.Policy{}
-        |> deny(:read, :foo)
+        |> deny(:foo, :read)
       end
 
       assert_raise ArgumentError, message.("1"), fn ->
         %Janus.Policy{}
-        |> deny(:read, 1)
+        |> deny(1, :read)
       end
     end
   end

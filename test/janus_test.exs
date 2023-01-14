@@ -10,7 +10,7 @@ defmodule JanusTest do
       @impl true
       def build_policy(policy, _) do
         policy
-        |> allow(:read, Thread)
+        |> allow(Thread, :read)
       end
     end
 

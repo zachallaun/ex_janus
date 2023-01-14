@@ -60,10 +60,10 @@ defmodule Janus do
 
       def build_policy(policy, %User{role: :moderator} = mod) do
         policy
-        |> allow(:read, Post)
-        |> allow([:edit, :archive, :unarchive], Post, where: [user: [role: :member]])
-        |> allow([:edit, :archive, :unarchive], Post, where: [user_id: mod.id])
-        |> deny(:unarchive, Post, where: [archived_by: [role: :admin]])
+        |> allow(Post, :read)
+        |> allow(Post, [:edit, :archive, :unarchive], where: [user: [role: :member]])
+        |> allow(Post, [:edit, :archive, :unarchive], where: [user_id: mod.id])
+        |> deny(Post, :unarchive, where: [archived_by: [role: :admin]])
       end
 
   See the `Janus.Policy` documentation for more on defining policies.

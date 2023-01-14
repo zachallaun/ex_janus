@@ -86,7 +86,7 @@ defmodule Mix.Tasks.Janus.Gen.PolicyTest do
 
       policy =
         %Janus.Policy{}
-        |> allow([:insert, :update, :delete], Thread,
+        |> allow(Thread, [:insert, :update, :delete],
           where: [creator_id: user.id, archived: false]
         )
 
