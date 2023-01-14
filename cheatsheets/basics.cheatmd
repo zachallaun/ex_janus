@@ -39,7 +39,7 @@ defmodule MyApp.Policy do
   use Janus
 
   @impl true
-  def build_policy(policy, user) do
+  def build_policy(%Janus.Policy{actor: _user} = policy) do
     policy
     |> # authorization rules
   end
@@ -92,14 +92,14 @@ MyApp.Policy.authorize(%Post{}, :edit, current_user)
 
 Actors are the users of your application.
 They can be a `%User{}` struct, but they don't have to be.
-Actors are converted to a policy using `build_policy/2`, so an actor can be anything that you want to use to differentiate between types of user.
+Actors are converted to a policy using `build_policy/1`, so an actor can be anything that you want to use to differentiate between types of user.
 They can even be a simple atom like `:normal_user` or `:admin_user`.
 
 #### In `build_policy/2`
 
 ```elixir
-def build_policy(policy, %User{}) do
-  #                      ^^^^^^^
+def build_policy(%Janus.Policy{actor: %User{}} = policy) do
+  #                                   ^^^^^^^
 end
 ```
 
@@ -150,7 +150,7 @@ policy
 
 ### Overview
 
-Authorization rules are attached to policies in the `build_policy/2` callback.
+Authorization rules are attached to policies in the `build_policy/1` callback.
 
 * `Janus.Policy.allow/4`
 * `Janus.Policy.deny/4`
@@ -200,7 +200,9 @@ policy
 ### Grant permission if the user is associated with the resource
 
 ```elixir
-def build_policy(policy, %User{role: :member} = user) do
+def build_policy(%Janus.Policy{actor: %User{role: :member}} = policy) do
+  %{actor: user} = policy
+
   policy
   |> allow(Comment, :edit, where: [user_id: user.id])
 end
@@ -235,7 +237,7 @@ policy
 
 ### Overview
 
-Hooks are attached to policies in the `build_policy/2` callback.
+Hooks are attached to policies in the `build_policy/1` callback.
 They are called prior to `authorize` or `scope` and can modify the resource/query or halt authorization altogether.
 
 * `Janus.Policy.attach_hook/4`
@@ -322,7 +324,7 @@ policy
 
 ```elixir
 @impl true
-def build_policy(policy, user) do
+def build_policy(%Janus.Policy{actor: user} = policy) do
   policy
   |> attach_hook(:ensure_unbanned, fn _, object, _ ->
     if Accounts.banned?(user.id) do
@@ -343,11 +345,11 @@ This can be useful if policies are being cached. If the call to `Accounts.banned
 ### Pattern-match to give different permissions to different actors
 
 ```elixir
-def build_policy(policy, %User{role: :member}) do
+def build_policy(%Janus.Policy{actor: %User{role: :member}} = policy) do
   # member permissions
 end
 
-def build_policy(policy, %User{role: :moderator}) do
+def build_policy(%Janus.Policy{actor: %User{role: :moderator}} = policy) do
   # moderator permissions
 end
 ```
@@ -355,10 +357,10 @@ end
 ### Delegate to context-specific policies
 
 ```elixir
-def build_policy(policy, actor) do
+def build_policy(policy) do
   policy
-  |> CommunityForum.Policy.build_policy(actor)
-  |> Storefront.Policy.build_policy(actor)
+  |> CommunityForum.Policy.build_policy()
+  |> Storefront.Policy.build_policy()
 end
 ```
 

@@ -7,7 +7,7 @@ defmodule Janus.Policy do
   and any restrictions to the set of resources that can be accessed.
   These policies are generally created implicitly for actors passed to
   functions defined by `Janus.Authorization`, but they can also be
-  created with `c:build_policy/2`.
+  created with `c:build_policy/1`.
 
   ## Creating a policy modules
 
@@ -19,12 +19,12 @@ defmodule Janus.Policy do
         use Janus
 
         @impl true
-        def build_policy(policy, _user) do
+        def build_policy(%Janus.Policy{actor: _user} = policy) do
           policy
         end
       end
 
-  The `build_policy/2` callback is the only callback that is required in
+  The `build_policy/1` callback is the only callback that is required in
   policy modules.
 
   ## Permissions with `allow` and `deny`
@@ -39,7 +39,9 @@ defmodule Janus.Policy do
   their own comments and any comments flagged for review, but not those
   made by an admin.
 
-      def build_policy(policy, %User{role: :moderator} = user) do
+      def build_policy(%Janus.Policy{actor: %User{role: :moderator}} = policy) do
+        %{actor: user} = policy
+
         policy
         |> allow(Comment, :edit, where: [user: [id: user.id]])
         |> allow(Comment, :edit, where: [flagged_for_review: true])
@@ -59,7 +61,9 @@ defmodule Janus.Policy do
   other. For instance, the moderation example above could also be
   written as:
 
-      def build_policy(policy, %User{role: :moderator} = user) do
+      def build_policy(%Janus.Policy{actor: %User{role: :moderator}} = policy) do
+        %{actor: user} = policy
+
         policy
         |> allow(Comment, :edit, where: [user_id: user.id])
         |> allow(Comment, :edit,
@@ -78,7 +82,9 @@ defmodule Janus.Policy do
   You can also use `:or_where` to combine with all previous conditions.
   For instance, the two examples above could also be written as:
 
-      def build_policy(policy, %User{role: :moderator} = user) do
+      def build_policy(%Janus.Policy{actor: %User{role: :moderator}} = policy) do
+        %{actor: user} = policy
+
         policy
         |> allow(Comment, :edit,
           where: [flagged_for_review: true],
@@ -114,7 +120,7 @@ defmodule Janus.Policy do
   keyword syntax presented above. In these cases, you can defer this
   check using an arity-3 function:
 
-      def build_policy(policy, user) do
+      def build_policy(policy) do
         policy
         |> allow(Comment, :read, where: [published_at: &in_the_past?/3])
       end
@@ -153,10 +159,11 @@ defmodule Janus.Policy do
     load_associations: false
   ]
 
-  defstruct [:module, config: %{}, rules: %{}, hooks: %{}]
+  defstruct [:module, :actor, config: %{}, rules: %{}, hooks: %{}]
 
   @type t :: %Policy{
           module: module(),
+          actor: Janus.actor(),
           config: map(),
           rules: %{
             {Janus.schema_module(), Janus.action()} => Rule.t()
@@ -171,45 +178,77 @@ defmodule Janus.Policy do
              {:cont, Ecto.Schema.t() | Authorization.filterable()} | :halt)
 
   @doc """
-  Returns the policy for the given actor.
+  Applies relevant authorization rules to the given policy.
 
-  This is the only callback that is required in a policy module.
+  For more information, see the `Janus.Policy` documentation.
   """
-  @callback build_policy(t, Janus.actor()) :: t
+  @callback build_policy(t) :: t
 
   @doc false
   defmacro __using__(opts \\ []) do
     quote location: :keep do
       @behaviour Janus.Policy
+      @before_compile Janus.Policy
+
       Module.register_attribute(__MODULE__, unquote(@config), persist: true)
       Module.put_attribute(__MODULE__, unquote(@config), unquote(opts))
 
       import Janus.Policy, except: [rule_for: 3, run_hooks: 4]
-
-      @doc """
-      Returns the policy for the given actor.
-
-      See `c:Janus.Policy.build_policy/2` for more information.
-      """
-      def build_policy(%Janus.Policy{} = policy), do: policy
-
-      def build_policy(actor) do
-        __MODULE__
-        |> Janus.Policy.new()
-        |> build_policy(actor)
-      end
     end
   end
 
+  defmacro __before_compile__(env) do
+    default =
+      unless Module.defines?(env.module, {:build_policy, 1}) do
+        message = """
+        function build_policy/1 required by behaviour Janus.Policy is not implemented \
+        (in module #{inspect(env.module)}).
+
+        A default implementation will be injected for now:
+
+            @impl Janus.Policy
+            def build_policy(policy) do
+              policy
+            end
+
+        See the documentation for Janus.Policy for more information.
+        """
+
+        IO.warn(message, env)
+
+        quote do
+          @impl Janus.Policy
+          def build_policy(policy) do
+            policy
+          end
+        end
+      end
+
+    [
+      default,
+      quote do
+        defoverridable build_policy: 1
+
+        def build_policy(%Janus.Policy{} = policy) do
+          super(policy)
+        end
+
+        def build_policy(actor) do
+          super(Janus.Policy.new(__MODULE__, actor))
+        end
+      end
+    ]
+  end
+
   @doc false
-  def new(module) do
+  def new(module, actor) do
     config =
       module.__info__(:attributes)
       |> Keyword.get(@config, [])
       |> Keyword.validate!(@config_defaults)
       |> Enum.into(%{})
 
-    %Janus.Policy{module: module, config: config}
+    %Janus.Policy{module: module, actor: actor, config: config}
   end
 
   @doc false

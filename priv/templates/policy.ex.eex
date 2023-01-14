@@ -68,7 +68,7 @@ defmodule <%= module %> do
   alias <%= app %>.Repo
 
   @impl true
-  def build_policy(policy, _user) do
+  def build_policy(%Janus.Policy{actor: _user} = policy) do
     # Attach permissions here using the `Janus.Policy` API
     policy
   end

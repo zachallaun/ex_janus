@@ -1,14 +1,15 @@
 defmodule JanusTest do
   use Janus.DataCase
+
   import Ecto.Query
   import Janus.Policy
 
-  describe "basic policy modules" do
+  describe "use Janus" do
     defmodule ExamplePolicy do
       use Janus
 
       @impl true
-      def build_policy(policy, _) do
+      def build_policy(%Janus.Policy{actor: _} = policy) do
         policy
         |> allow(Thread, :read)
       end
@@ -50,9 +51,13 @@ defmodule JanusTest do
                }
              } = ExamplePolicy.build_policy(:user)
     end
+
+    test "define a build_policy/1 wrapper that attaches the given actor" do
+      assert %Janus.Policy{actor: :my_actor} = ExamplePolicy.build_policy(:my_actor)
+    end
   end
 
-  describe "policy modules with config" do
+  describe "use Janus with opts" do
     test "should accept options when defining the module" do
       [{module, _}] =
         quote do
@@ -62,7 +67,7 @@ defmodule JanusTest do
               load_associations: true
 
             @impl true
-            def build_policy(policy, _actor), do: policy
+            def build_policy(policy), do: policy
           end
         end
         |> Code.compile_quoted()
@@ -79,7 +84,7 @@ defmodule JanusTest do
             use Janus, not_valid: true
 
             @impl true
-            def build_policy(policy, _actor), do: policy
+            def build_policy(policy), do: policy
           end
         end
         |> Code.compile_quoted()

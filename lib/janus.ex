@@ -43,13 +43,13 @@ defmodule Janus do
         use Janus
 
         @impl true
-        def build_policy(policy, _user) do
+        def build_policy(%Janus.Policy{actor: _user} = policy) do
           policy
         end
       end
 
   When you invoke `use Janus`, default implementations are injected for
-  required callbacks, except for `c:Janus.Policy.build_policy/2`. This
+  required callbacks, except for `c:Janus.Policy.build_policy/1`. This
   callback is your foundation, as it returns the authorization policy
   for an individual user of your application.
 
@@ -58,7 +58,9 @@ defmodule Janus do
   define actions, resources, and conditions that make up your
   authorization rules.
 
-      def build_policy(policy, %User{role: :moderator} = mod) do
+      def build_policy(%Janus.Policy{actor: %User{role: :moderator}} = policy) do
+        %{actor: mod} = policy
+
         policy
         |> allow(Post, :read)
         |> allow(Post, [:edit, :archive, :unarchive], where: [user: [role: :member]])
@@ -158,9 +160,8 @@ defmodule Janus do
 
   Using `use Janus` does the following:
 
-    * adds the `Janus.Policy` behaviour, imports functions used to
-      define the required callback `c:Janus.Policy.build_policy/2`, and
-      defines a `build_policy/1` helper
+    * adds the `Janus.Policy` behaviour and imports functions used to
+      define the `c:Janus.Policy.build_policy/1` callback
 
     * adds the `Janus.Authorization` behaviour and injects default
       (overridable) implementations for all callbacks
@@ -182,7 +183,7 @@ defmodule Janus do
         use Janus, repo: MyApp.Repo
 
         @impl true
-        def build_policy(policy, _actor) do
+        def build_policy(policy) do
           policy
           # |> allow(...)
         end
@@ -193,7 +194,6 @@ defmodule Janus do
       @behaviour Janus.Authorization
 
       use Janus.Policy, unquote(opts)
-      require Janus
 
       @impl Janus.Authorization
       def authorize(resource, action, actor, opts \\ []) do

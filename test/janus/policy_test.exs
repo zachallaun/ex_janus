@@ -1,8 +1,34 @@
 defmodule Janus.PolicyTest do
   use Janus.DataCase
 
+  import ExUnit.CaptureIO
   import Janus.Policy
+
   alias Janus.Authorization, as: Auth
+
+  describe "use Janus.Policy" do
+    test "warns and injects a default if c:build_policy/1 is not defined" do
+      {[{module, _}], message} =
+        with_io(:stderr, fn ->
+          quote do
+            defmodule ShouldWarn do
+              use Janus.Policy
+            end
+          end
+          |> Code.compile_quoted()
+        end)
+
+      expected = """
+      function build_policy/1 required by behaviour Janus.Policy is not implemented \
+      (in module ShouldWarn).
+      """
+
+      assert message =~ "warning:"
+      assert message =~ expected
+
+      assert %Janus.Policy{actor: :my_actor} = module.build_policy(:my_actor)
+    end
+  end
 
   describe "allow/4 and deny/4" do
     test "raises on unknown conditions" do
