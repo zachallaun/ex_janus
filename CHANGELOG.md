@@ -6,6 +6,20 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Enhancements
 
+  * [Janus.Policy / **Breaking**] `build_policy/2` replaced with `build_policy/1`, with the actor added as a field to `%Janus.Policy{}` instead of being passed as a second argument
+
+    ```elixir
+    # old
+    def build_policy(%Janus.Policy{} = policy, actor) do
+      # ...
+    end
+
+    # new
+    def build_policy(%Janus.Policy{actor: actor} = policy) do
+      # ...
+    end
+    ```
+
   * [Janus.Policy / **Breaking**] Change schema/action argument order in `allow/4` and `deny/4` to be more consistent with the rest of Janus
 
     ```elixir
