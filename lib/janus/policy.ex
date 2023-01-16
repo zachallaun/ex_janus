@@ -48,11 +48,12 @@ defmodule Janus.Policy do
   their own comments and any comments flagged for review, but not those
   made by an admin.
 
+      @impl true
       def build_policy(policy, %User{role: :moderator} = user) do
         policy
-        |> allow(Comment, :edit, where: [user: [id: user.id]])
-        |> allow(Comment, :edit, where: [flagged_for_review: true])
-        |> deny(Comment, :edit, where: [user: [role: :admin]])
+        |> allow(Comment, :update, where: [user: [id: user.id]])
+        |> allow(Comment, :update, where: [flagged_for_review: true])
+        |> deny(Comment, :update, where: [user: [role: :admin]])
       end
 
   While set of keyword options passed to `allow` and `deny` are
@@ -60,7 +61,7 @@ defmodule Janus.Policy do
   functions and not macros, there is no need to use the `^value` syntax
   used in Ecto. For example, the following would result in an error:
 
-      allow(policy, Comment, :edit, where: [user: [id: ^user.id]])
+      allow(policy, Comment, :update, where: [user: [id: ^user.id]])
 
   ### `:where` and `:where_not` conditions
 
@@ -68,10 +69,11 @@ defmodule Janus.Policy do
   other. For instance, the moderation example above could also be
   written as:
 
+      @impl true
       def build_policy(policy, %User{role: :moderator} = user) do
         policy
-        |> allow(Comment, :edit, where: [user_id: user.id])
-        |> allow(Comment, :edit,
+        |> allow(Comment, :update, where: [user_id: user.id])
+        |> allow(Comment, :update,
           where: [flagged_for_review: true],
           where_not: [user: [role: :admin]]
         )
@@ -87,9 +89,10 @@ defmodule Janus.Policy do
   You can also use `:or_where` to combine with all previous conditions.
   For instance, the two examples above could also be written as:
 
+      @impl true
       def build_policy(policy, %User{role: :moderator} = user) do
         policy
-        |> allow(Comment, :edit,
+        |> allow(Comment, :update,
           where: [flagged_for_review: true],
           where_not: [user: [role: :admin]],
           or_where: [user_id: user.id]
@@ -104,7 +107,7 @@ defmodule Janus.Policy do
   These clauses could be reordered to have a different meaning:
 
       policy
-      |> allow(Comment, :edit,
+      |> allow(Comment, :update,
         where: [flagged_for_review: true],
         or_where: [user_id: user.id],
         where_not: [user: [role: :admin]]
@@ -123,6 +126,7 @@ defmodule Janus.Policy do
   keyword syntax presented above. In these cases, you can defer this
   check using an arity-3 function:
 
+      @impl true
       def build_policy(policy, _actor) do
         policy
         |> allow(Comment, :read, where: [published_at: &in_the_past?/3])
@@ -143,6 +147,48 @@ defmodule Janus.Policy do
   clauses based on their first argument, `:boolean` or `:dynamic`, so
   that they can handle both operations on a single record and operations
   that should compose with an Ecto query.
+
+  ## Working with rulesets
+
+  Policies can also be defined by attaching rulesets created using
+  `allow/3` and `deny/3`. Instead of taking a policy as a first argument,
+  these functions take a schema (or a ruleset).
+
+  Rulesets are specific to an individual schema and can be attached to
+  a policy using `attach/2`. For example:
+
+      @impl true
+      def build_policy(policy, actor) do
+        policy
+        |> attach(rules_for(Thread, actor))
+        |> attach(rules_for(Post, actor))
+      end
+
+      defp rules_for(Thread, %User{id: user_id}) do
+        Thread
+        |> allow(:read, where: [archived: false])
+        |> allow([:create, :update], where: [creator_id: user_id])
+      end
+
+      defp rules_for(Thread, nil) do
+        Thread
+        |> allow(:read, where: [archived: false, visibility: :public])
+      end
+
+      defp rules_for(Post, _actor) do
+        Post
+        |> allow(:read, where: [thread: allows(:read)])
+      end
+
+  Depending on your specific needs, rulesets may allow you to organize
+  policies in a way that is easier to maintain. In the above example,
+  delegating to a private `rules_for/2` function that returns a ruleset
+  allows us to pattern-match on a `nil` user where it matters and share
+  a ruleset where it doesn't.
+
+  This pattern has tradeoffs, however. You would need to ensure that the
+  pattern-matching for each schema is exhaustive, for instance, otherwise
+  a `FunctionClauseError` might be raised.
 
   ## Hooks
 
