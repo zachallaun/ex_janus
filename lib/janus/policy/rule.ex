@@ -44,6 +44,16 @@ defmodule Janus.Policy.Rule do
     Map.update(rule, :deny, [opts], &[opts | &1])
   end
 
+  @doc false
+  def merge(
+        %{schema: s, action: a} = rule,
+        %{schema: s, action: a, allow: allow, deny: deny}
+      ) do
+    rule = Enum.reduce(allow, rule, &allow(&2, &1))
+    rule = Enum.reduce(deny, rule, &deny(&2, &1))
+    rule
+  end
+
   defp parse_opts!(opts) do
     with true <- Keyword.keyword?(opts),
          [] <- opts |> Keyword.keys() |> Enum.uniq() |> Kernel.--(@valid_clauses) do

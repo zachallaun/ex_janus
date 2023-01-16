@@ -175,6 +175,8 @@ defmodule Janus.Policy do
           }
         }
 
+  @type ruleset :: %{schema: Janus.schema_module(), rules: %{Janus.action() => Rule.t()}}
+
   @type hook ::
           (Ecto.Schema.t() | Authorization.filterable(), Janus.action(), t ->
              {:cont, Ecto.Schema.t() | Authorization.filterable()} | :halt)
@@ -255,8 +257,6 @@ defmodule Janus.Policy do
       |> allow(SecondResource, :create, where: [creator: [id: user.id]])
   """
   @spec allow(t, Janus.schema_module(), Janus.action() | [Janus.action()], keyword()) :: t
-  def allow(policy, schema, action, opts \\ [])
-
   def allow(%Policy{} = policy, schema, actions, opts) when is_list(actions) do
     Enum.reduce(actions, policy, fn action, policy ->
       allow(policy, schema, action, opts)
@@ -272,6 +272,53 @@ defmodule Janus.Policy do
     |> put_rule(policy)
   end
 
+  @doc false
+  def allow(%Policy{} = policy, schema, action) do
+    allow(policy, schema, action, [])
+  end
+
+  @doc """
+  Creates or updates a ruleset for a schema to allow an action if matched
+  by conditions.
+
+  Must be attached to a policy using `attach/2`.
+
+  See "Permissions with `allow` and `deny`" for a description of conditions.
+
+  ## Examples
+
+      thread_rules =
+        Thread
+        |> allow(:read)
+        |> allow(:create, where: [creator_id: user.id])
+
+      attach(policy, thread_rules)
+  """
+  @spec allow(Janus.schema_module() | ruleset, Janus.action() | [Janus.action()], keyword()) ::
+          ruleset
+  def allow(schema_or_ruleset, actions, opts) when is_list(actions) do
+    Enum.reduce(actions, schema_or_ruleset, fn action, schema_or_ruleset ->
+      allow(schema_or_ruleset, action, opts)
+    end)
+  end
+
+  def allow(%{schema: schema} = ruleset, action, opts) do
+    ruleset
+    |> rule_for(action, schema)
+    |> Rule.allow(opts)
+    |> put_rule(ruleset)
+  end
+
+  def allow(schema, action, opts) do
+    validate_schema!(schema)
+    allow(%{schema: schema, rules: %{}}, action, opts)
+  end
+
+  @doc false
+  def allow(schema_or_ruleset, action) do
+    allow(schema_or_ruleset, action, [])
+  end
+
   @doc """
   Denies an action on the schema if matched by conditions.
 
@@ -284,8 +331,6 @@ defmodule Janus.Policy do
       |> deny(FirstResource, :read, where: [scope: :private])
   """
   @spec deny(t, Janus.schema_module(), Janus.action() | [Janus.action()], keyword()) :: t
-  def deny(policy, schema, action, opts \\ [])
-
   def deny(%Policy{} = policy, schema, actions, opts) when is_list(actions) do
     Enum.reduce(actions, policy, fn action, policy ->
       deny(policy, schema, action, opts)
@@ -299,6 +344,53 @@ defmodule Janus.Policy do
     |> rule_for(action, schema)
     |> Rule.deny(opts)
     |> put_rule(policy)
+  end
+
+  @doc false
+  def deny(%Policy{} = policy, schema, action) do
+    deny(policy, schema, action, [])
+  end
+
+  @doc """
+  Creates or updates a ruleset for a schema to deny an action if matched
+  by conditions.
+
+  Must be attached to a policy using `attach/2`.
+
+  See "Permissions with `allow` and `deny`" for a description of conditions.
+
+  ## Examples
+
+      thread_rules =
+        Thread
+        |> allow(:read)
+        |> deny(:read, where: [scope: :private])
+
+      attach(policy, thread_rules)
+  """
+  @spec deny(Janus.schema_module() | ruleset, Janus.action() | [Janus.action()], keyword()) ::
+          ruleset
+  def deny(schema_or_ruleset, actions, opts) when is_list(actions) do
+    Enum.reduce(actions, schema_or_ruleset, fn action, schema_or_ruleset ->
+      deny(schema_or_ruleset, action, opts)
+    end)
+  end
+
+  def deny(%{schema: schema} = ruleset, action, opts) do
+    ruleset
+    |> rule_for(action, schema)
+    |> Rule.deny(opts)
+    |> put_rule(ruleset)
+  end
+
+  def deny(schema, action, opts) do
+    validate_schema!(schema)
+    deny(%{schema: schema, rules: %{}}, action, opts)
+  end
+
+  @doc false
+  def deny(schema_or_ruleset, action) do
+    deny(schema_or_ruleset, action, [])
   end
 
   defp validate_schema!(schema) when is_atom(schema) do
@@ -361,16 +453,28 @@ defmodule Janus.Policy do
   """
   def allows(action), do: {:__derived__, :allow, action}
 
+  @doc """
+  Attach a ruleset created using `allow/3` and `deny/3` to a policy.
+  """
+  @spec attach(policy :: t, ruleset) :: t
+  def attach(%Policy{} = policy, %{rules: rules}) do
+    Enum.reduce(rules, policy, fn {{schema, action}, rule}, policy ->
+      policy
+      |> rule_for(action, schema)
+      |> Rule.merge(rule)
+      |> put_rule(policy)
+    end)
+  end
+
   @doc false
-  @spec rule_for(t, Janus.action(), Janus.schema_module()) :: Rule.t()
-  def rule_for(%Policy{rules: rules}, action, schema) do
+  def rule_for(%{rules: rules}, action, schema) do
     Map.get_lazy(rules, {schema, action}, fn ->
       Rule.new(schema, action)
     end)
   end
 
-  defp put_rule(%Rule{schema: schema, action: action} = rule, policy) do
-    update_in(policy.rules, &Map.put(&1, {schema, action}, rule))
+  defp put_rule(%Rule{schema: schema, action: action} = rule, policy_or_ruleset) do
+    update_in(policy_or_ruleset.rules, &Map.put(&1, {schema, action}, rule))
   end
 
   @doc """

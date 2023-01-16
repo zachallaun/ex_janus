@@ -161,6 +161,28 @@ defmodule Janus.PolicyTest do
     end
   end
 
+  describe "allow/3 and deny/3" do
+    test "should build up rules that can be attached with attach/2" do
+      rules =
+        Thread
+        |> allow([:read, :edit])
+        |> deny(:edit, where: [title: "denied"])
+
+      policy = attach(%Janus.Policy{}, rules)
+
+      %{id: thread_id} = thread = thread_fixture()
+
+      assert {:ok, ^thread} = Auth.authorize(thread, :read, policy)
+      assert {:ok, _thread} = Auth.authorize(%Thread{}, :edit, policy)
+      assert [%Thread{id: ^thread_id}] = Auth.scope(Thread, :read, policy) |> Repo.all()
+
+      denied = thread_fixture(%{title: "denied"})
+
+      assert {:error, :not_authorized} = Auth.authorize(denied, :edit, policy)
+      assert [%Thread{id: ^thread_id}] = Auth.scope(Thread, :edit, policy) |> Repo.all()
+    end
+  end
+
   describe "hooks" do
     test "should be added with attach_hook/4" do
       policy =
