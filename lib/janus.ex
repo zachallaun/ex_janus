@@ -274,20 +274,23 @@ defmodule Janus do
 
       @impl Janus.Authorization
       def authorize(resource, action, actor, opts \\ []) do
-        Janus.Authorization.authorize(resource, action, build_policy(actor), opts)
+        Janus.Authorization.authorize(resource, action, __policy_for__(actor), opts)
       end
 
       @impl Janus.Authorization
       def any_authorized?(schema, action, actor) do
-        Janus.Authorization.any_authorized?(schema, action, build_policy(actor))
+        Janus.Authorization.any_authorized?(schema, action, __policy_for__(actor))
       end
 
       @impl Janus.Authorization
       def scope(query_or_schema, action, actor, opts \\ []) do
-        Janus.Authorization.scope(query_or_schema, action, build_policy(actor), opts)
+        Janus.Authorization.scope(query_or_schema, action, __policy_for__(actor), opts)
       end
 
       defoverridable authorize: 4, any_authorized?: 3, scope: 4
+
+      defp __policy_for__(%Janus.Policy{} = policy), do: policy
+      defp __policy_for__(actor), do: build_policy(actor)
     end
   end
 end

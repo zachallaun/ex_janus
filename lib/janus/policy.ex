@@ -12,8 +12,7 @@ defmodule Janus.Policy do
   ## Creating a policy modules
 
   While you can create a policy module with `use Janus.Policy`, you will
-  usually invoke `use Janus` to create a module that implements both
-  this and the `Janus.Authorization` behaviour:
+  usually invoke `use Janus` and implement `c:build_policy/2`:
 
       defmodule MyApp.Policy do
         use Janus
@@ -24,8 +23,18 @@ defmodule Janus.Policy do
         end
       end
 
-  The `build_policy/2` callback is the only callback that is required in
-  policy modules.
+  An implementation for `c:build_policy/1` is injected into the policy
+  module.
+
+  Policy modules can now be used to generate policy structs explicitly
+  (though they will usually be created implicitly when calling functions
+  defined by `Janus.Authorization`).
+
+      iex> policy = MyApp.Policy.build_policy(:my_user)
+      %Janus.Policy{actor: :my_user, rules: %{...}}
+
+      iex> MyApp.SecondaryPolicy.build_policy(policy)
+      %Janus.Policy{actor: :my_user, rules: %{...}}
 
   ## Permissions with `allow` and `deny`
 
@@ -153,10 +162,11 @@ defmodule Janus.Policy do
     load_associations: false
   ]
 
-  defstruct [:module, config: %{}, rules: %{}, hooks: %{}]
+  defstruct [:module, :actor, config: %{}, rules: %{}, hooks: %{}]
 
   @type t :: %Policy{
           module: module(),
+          actor: Janus.actor(),
           config: map(),
           rules: %{
             {Janus.schema_module(), Janus.action()} => Rule.t()
@@ -171,9 +181,21 @@ defmodule Janus.Policy do
              {:cont, Ecto.Schema.t() | Authorization.filterable()} | :halt)
 
   @doc """
-  Returns the policy for the given actor.
+  Builds an authorization policy, delegating to `c:build_policy/2`.
 
-  This is the only callback that is required in a policy module.
+  If given a policy, calls `c:build_policy/2` with the policy and the
+  actor associated with the policy. If given an actor, creates an empty
+  policy associated with that actor and passes it to `c:build_policy/2`.
+
+  An implementation for this callback is injected into modules invoking
+  either `use Janus` or `use Janus.Policy`.
+  """
+  @callback build_policy(t | Janus.actor()) :: t
+
+  @doc """
+  Builds an authorization policy containing rules for the given actor.
+
+  See `Janus.Policy` for API documentation on building policies.
   """
   @callback build_policy(t, Janus.actor()) :: t
 
@@ -186,30 +208,27 @@ defmodule Janus.Policy do
 
       import Janus.Policy, except: [rule_for: 3, run_hooks: 4]
 
-      @doc """
-      Returns the policy for the given actor.
-
-      See `c:Janus.Policy.build_policy/2` for more information.
-      """
-      def build_policy(%Janus.Policy{} = policy), do: policy
+      @impl true
+      def build_policy(%Janus.Policy{actor: actor} = policy) do
+        build_policy(policy, actor)
+      end
 
       def build_policy(actor) do
-        __MODULE__
-        |> Janus.Policy.new()
-        |> build_policy(actor)
+        policy = Janus.Policy.new(__MODULE__, actor)
+        build_policy(policy, actor)
       end
     end
   end
 
   @doc false
-  def new(module) do
+  def new(module, actor) do
     config =
       module.__info__(:attributes)
       |> Keyword.get(@config, [])
       |> Keyword.validate!(@config_defaults)
       |> Enum.into(%{})
 
-    %Janus.Policy{module: module, config: config}
+    %Janus.Policy{module: module, actor: actor, config: config}
   end
 
   @doc false

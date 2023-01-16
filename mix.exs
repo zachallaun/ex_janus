@@ -46,7 +46,8 @@ defmodule Janus.MixProject do
       {:dialyxir, "~> 1.2", only: [:dev, :test], runtime: false},
       {:ecto_sql, "~> 3.9", only: [:dev, :test]},
       {:jason, "~> 1.4", only: [:dev, :test]},
-      {:postgrex, "~> 0.16", only: :test}
+      {:postgrex, "~> 0.16", only: :test},
+      {:patch, "~> 0.12.0", only: :test}
     ]
   end
 

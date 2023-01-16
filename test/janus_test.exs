@@ -1,9 +1,11 @@
 defmodule JanusTest do
   use Janus.DataCase
+  use Patch
+
   import Ecto.Query
   import Janus.Policy
 
-  describe "basic policy modules" do
+  describe "policy modules" do
     defmodule ExamplePolicy do
       use Janus
 
@@ -49,6 +51,34 @@ defmodule JanusTest do
                  load_associations: false
                }
              } = ExamplePolicy.build_policy(:user)
+    end
+
+    test "build_policy/1 accepts an actor or policy" do
+      spy(JanusTest.Policy)
+
+      assert %Janus.Policy{actor: :my_actor} = JanusTest.Policy.build_policy(:my_actor)
+      assert_called(JanusTest.Policy.build_policy(%Janus.Policy{actor: :my_actor}, :my_actor))
+
+      assert %Janus.Policy{actor: :my_actor} =
+               JanusTest.Policy.build_policy(%Janus.Policy{actor: :my_actor})
+
+      assert_called(JanusTest.Policy.build_policy(%Janus.Policy{actor: :my_actor}, :my_actor))
+    end
+
+    test "injected callbacks don't call `build_policy/2` if passed a policy" do
+      spy(JanusTest.Policy)
+
+      policy = %Janus.Policy{actor: :my_actor}
+      thread = thread_fixture()
+
+      assert {:error, :not_authorized} = JanusTest.Policy.authorize(thread, :read, policy)
+      refute_called(JanusTest.Policy.build_policy(_, _))
+
+      refute JanusTest.Policy.any_authorized?(Thread, :read, policy)
+      refute_called(JanusTest.Policy.build_policy(_, _))
+
+      assert [] = JanusTest.Policy.scope(Thread, :read, policy) |> Repo.all()
+      refute_called(JanusTest.Policy.build_policy(_, _))
     end
   end
 
