@@ -1,21 +1,7 @@
 # The Basics
 
-## Installation and setup
+## Setup
 {: .col-2}
-
-### Dependency
-
-#### mix.exs
-
-```elixir
-defp deps do
-  [
-    {:ex_janus, "~> 0.2.1"}
-  ]
-end
-```
-
-Ecto v3.9.4 or later and a database that supports lateral joins (like PostgreSQL) is required to use all Janus features.
 
 ### Generator
 
@@ -53,7 +39,7 @@ For more information on defining policies, see the [Policy Definition Cheatsheet
 
 ### Schemas
 
-Schemas are modules that `use Ecto.Schema` and are used heavily by Janus.
+Schemas are modules that `use Ecto.Schema`.
 
 #### Used when defining policies
 
