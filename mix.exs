@@ -91,12 +91,11 @@ defmodule Janus.MixProject do
 
   defp docs do
     [
-      main: "readme",
+      main: "Janus",
       api_reference: false,
       source_url: @source_url,
       extra_section: "GUIDES",
       extras: [
-        "README.md",
         "CHANGELOG.md",
         "cheatsheets/basics.cheatmd",
         "cheatsheets/policy_usage.cheatmd",
