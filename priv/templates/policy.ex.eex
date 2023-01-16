@@ -68,7 +68,7 @@ defmodule <%= module %> do
   alias <%= app %>.Repo
 
   @impl true
-  def build_policy(policy, _user) do
+  def build_policy(policy, _actor) do
     # Attach permissions here using the `Janus.Policy` API
     policy
   end
@@ -86,11 +86,11 @@ defmodule <%= module %> do
 
   ## Options
 
-    * `:authorize` - The `{action, user}` tuplet or `false` to skip
-      authorization, see "Authorized Repo operations" for more
+    * `:authorize` - An `{action, actor}` tuplet to authorize, or `false`
+      to skip authorization. See "Authorized Repo operations" for more.
     * `:load_associations` - Whether to load associations if necessary
-      for authorization
-    * Any option accepted by `c:Ecto.Repo.get_by/3`
+      for authorization.
+    * Any option accepted by `c:Ecto.Repo.get_by/3`.
 
   ## Examples
 
@@ -132,11 +132,11 @@ defmodule <%= module %> do
 
   ## Options
 
-    * `:authorize` - The `{action, user}` tuplet or `false` to skip
-      authorization, see "Authorized Repo operations" for more
-    * `:preload_authorized` - preload authorized entries into
-      associations, see `Janus.Authorization.scope/4` for more
-    * Any option accepted by `c:Ecto.Repo.all/2`
+    * `:authorize` - An `{action, actor}` tuplet to authorize, or `false`
+      to skip authorization. See "Authorized Repo operations" for more.
+    * `:preload_authorized` - preload authorized entries into associations,
+      see `Janus.Authorization.scope/4` for more.
+    * Any option accepted by `c:Ecto.Repo.all/2`.
 
   ## Examples
 
@@ -188,9 +188,9 @@ defmodule <%= module %> do
 
   ## Options
 
-    * `:authorize` - The `{action, user}` tuplet or `false` to skip
-      authorization, see "Authorized Repo operations" for more
-    * Any option accepted by `c:Ecto.Repo.delete/2`
+    * `:authorize` - An `{action, actor}` tuplet to authorize, or `false`
+      to skip authorization. See "Authorized Repo operations" for more.
+    * Any option accepted by `c:Ecto.Repo.delete/2`.
 
   ## Examples
 
@@ -239,9 +239,9 @@ defmodule <%= module %> do
 
   ## Options
 
-    * `:authorize` - The `{action, user}` tuplet or `false` to skip
-      authorization, see "Authorized Repo operations" for more
-    * Any option accepted by `c:Ecto.Repo.update/2`
+    * `:authorize` - An `{action, actor}` tuplet to authorize, or `false`
+      to skip authorization. See "Authorized Repo operations" for more.
+    * Any option accepted by `c:Ecto.Repo.update/2`.
 
   ## Examples
 
@@ -283,9 +283,9 @@ defmodule <%= module %> do
 
   ## Options
 
-    * `:authorize` - The `{action, user}` tuplet or `false` to skip
-      authorization, see "Authorized Repo operations" for more
-    * Any option accepted by `c:Ecto.Repo.insert/2`
+    * `:authorize` - An `{action, actor}` tuplet to authorize, or `false`
+      to skip authorization. See "Authorized Repo operations" for more.
+    * Any option accepted by `c:Ecto.Repo.insert/2`.
 
   ## Examples
 

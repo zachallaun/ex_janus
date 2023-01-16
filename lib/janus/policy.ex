@@ -19,7 +19,7 @@ defmodule Janus.Policy do
         use Janus
 
         @impl true
-        def build_policy(policy, _user) do
+        def build_policy(policy, _actor) do
           policy
         end
       end
@@ -114,7 +114,7 @@ defmodule Janus.Policy do
   keyword syntax presented above. In these cases, you can defer this
   check using an arity-3 function:
 
-      def build_policy(policy, user) do
+      def build_policy(policy, _actor) do
         policy
         |> allow(Comment, :read, where: [published_at: &in_the_past?/3])
       end

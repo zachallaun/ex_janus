@@ -39,7 +39,7 @@ defmodule MyApp.Policy do
   use Janus
 
   @impl true
-  def build_policy(policy, user) do
+  def build_policy(policy, actor) do
     policy
     |> # authorization rules
   end

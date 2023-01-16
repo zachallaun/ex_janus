@@ -53,7 +53,7 @@ defmodule Janus do
         use Janus
 
         @impl true
-        def build_policy(policy, _user) do
+        def build_policy(policy, _actor) do
           policy
         end
       end
