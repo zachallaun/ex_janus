@@ -40,7 +40,7 @@ defmodule Janus do
 
       defp deps do
         [
-          {:ex_janus, "~> 0.2.1"}
+          {:ex_janus, "~> #{Janus.MixProject.version()}"}
         ]
       end
 

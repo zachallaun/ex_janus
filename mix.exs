@@ -3,12 +3,13 @@ defmodule Janus.MixProject do
 
   @app :ex_janus
   @source_url "https://github.com/zachallaun/ex_janus"
-  @version "0.2.1"
+
+  def version, do: "0.3.0"
 
   def project do
     [
       app: @app,
-      version: @version,
+      version: version(),
       elixir: "~> 1.14",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
