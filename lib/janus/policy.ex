@@ -162,10 +162,9 @@ defmodule Janus.Policy do
     load_associations: false
   ]
 
-  defstruct [:module, :actor, config: %{}, rules: %{}, hooks: %{}]
+  defstruct [:actor, config: %{}, rules: %{}, hooks: %{}]
 
   @type t :: %Policy{
-          module: module(),
           actor: Janus.actor(),
           config: map(),
           rules: %{
@@ -228,7 +227,7 @@ defmodule Janus.Policy do
       |> Keyword.validate!(@config_defaults)
       |> Enum.into(%{})
 
-    %Janus.Policy{module: module, actor: actor, config: config}
+    %Janus.Policy{actor: actor, config: config}
   end
 
   @doc false
