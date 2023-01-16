@@ -2,6 +2,12 @@
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Enhancements
+
+  * [Janus.Policy] Add rulesets: `Janus.Policy.attach/2`, `Janus.Policy.allow/3`, `Janus.Policy.deny/3`.
+
 ## v0.3.0 (2023-01-16)
 
 ### Enhancements
