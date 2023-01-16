@@ -291,6 +291,13 @@ defmodule Janus.Policy do
     %{policy | config: config}
   end
 
+  @doc false
+  def rule_for(%{rules: rules}, action, schema) do
+    Map.get_lazy(rules, {schema, action}, fn ->
+      Rule.new(schema, action)
+    end)
+  end
+
   @doc """
   Allows an action on the schema if matched by conditions.
 
@@ -303,19 +310,8 @@ defmodule Janus.Policy do
       |> allow(SecondResource, :create, where: [creator: [id: user.id]])
   """
   @spec allow(t, Janus.schema_module(), Janus.action() | [Janus.action()], keyword()) :: t
-  def allow(%Policy{} = policy, schema, actions, opts) when is_list(actions) do
-    Enum.reduce(actions, policy, fn action, policy ->
-      allow(policy, schema, action, opts)
-    end)
-  end
-
   def allow(%Policy{} = policy, schema, action, opts) do
-    validate_schema!(schema)
-
-    policy
-    |> rule_for(action, schema)
-    |> Rule.allow(opts)
-    |> put_rule(policy)
+    apply_rule(policy, :allow, schema, action, opts)
   end
 
   @doc false
@@ -342,22 +338,12 @@ defmodule Janus.Policy do
   """
   @spec allow(Janus.schema_module() | ruleset, Janus.action() | [Janus.action()], keyword()) ::
           ruleset
-  def allow(schema_or_ruleset, actions, opts) when is_list(actions) do
-    Enum.reduce(actions, schema_or_ruleset, fn action, schema_or_ruleset ->
-      allow(schema_or_ruleset, action, opts)
-    end)
-  end
-
   def allow(%{schema: schema} = ruleset, action, opts) do
-    ruleset
-    |> rule_for(action, schema)
-    |> Rule.allow(opts)
-    |> put_rule(ruleset)
+    apply_rule(ruleset, :allow, schema, action, opts)
   end
 
   def allow(schema, action, opts) do
-    validate_schema!(schema)
-    allow(%{schema: schema, rules: %{}}, action, opts)
+    apply_rule(%{schema: schema, rules: %{}}, :allow, schema, action, opts)
   end
 
   @doc false
@@ -377,19 +363,8 @@ defmodule Janus.Policy do
       |> deny(FirstResource, :read, where: [scope: :private])
   """
   @spec deny(t, Janus.schema_module(), Janus.action() | [Janus.action()], keyword()) :: t
-  def deny(%Policy{} = policy, schema, actions, opts) when is_list(actions) do
-    Enum.reduce(actions, policy, fn action, policy ->
-      deny(policy, schema, action, opts)
-    end)
-  end
-
   def deny(%Policy{} = policy, schema, action, opts) do
-    validate_schema!(schema)
-
-    policy
-    |> rule_for(action, schema)
-    |> Rule.deny(opts)
-    |> put_rule(policy)
+    apply_rule(policy, :deny, schema, action, opts)
   end
 
   @doc false
@@ -416,38 +391,17 @@ defmodule Janus.Policy do
   """
   @spec deny(Janus.schema_module() | ruleset, Janus.action() | [Janus.action()], keyword()) ::
           ruleset
-  def deny(schema_or_ruleset, actions, opts) when is_list(actions) do
-    Enum.reduce(actions, schema_or_ruleset, fn action, schema_or_ruleset ->
-      deny(schema_or_ruleset, action, opts)
-    end)
-  end
-
   def deny(%{schema: schema} = ruleset, action, opts) do
-    ruleset
-    |> rule_for(action, schema)
-    |> Rule.deny(opts)
-    |> put_rule(ruleset)
+    apply_rule(ruleset, :deny, schema, action, opts)
   end
 
   def deny(schema, action, opts) do
-    validate_schema!(schema)
-    deny(%{schema: schema, rules: %{}}, action, opts)
+    apply_rule(%{schema: schema, rules: %{}}, :deny, schema, action, opts)
   end
 
   @doc false
   def deny(schema_or_ruleset, action) do
     deny(schema_or_ruleset, action, [])
-  end
-
-  defp validate_schema!(schema) when is_atom(schema) do
-    function_exported?(schema, :__schema__, 1) || invalid_schema!(schema)
-  end
-
-  defp validate_schema!(other), do: invalid_schema!(other)
-
-  defp invalid_schema!(invalid) do
-    raise ArgumentError,
-          "received invalid module #{inspect(invalid)}, expected a module defined using Ecto.Schema"
   end
 
   @doc """
@@ -461,15 +415,15 @@ defmodule Janus.Policy do
   Allow users to edit any posts they can delete.
 
       policy
-      |> allow(Post, :edit, where: allows(:delete))
+      |> allow(Post, :update, where: allows(:delete))
       |> allow(Post, :delete, where: [user_id: user.id])
 
   Don't allow users to edit posts they can't read.
 
       policy
       |> allow(Post, :read, where: [archived: false])
-      |> allow(Post, :edit, where: [user_id: user.id])
-      |> deny(Post, :edit, where_not: allows(:read))
+      |> allow(Post, :update, where: [user_id: user.id])
+      |> deny(Post, :update, where_not: allows(:read))
 
   ## Example with associations
 
@@ -501,6 +455,15 @@ defmodule Janus.Policy do
 
   @doc """
   Attach a ruleset created using `allow/3` and `deny/3` to a policy.
+
+  ## Examples
+
+      thread_rules =
+        Thread
+        |> allow(:read)
+        |> deny(:read, where: [scope: :private])
+
+      attach(policy, thread_rules)
   """
   @spec attach(policy :: t, ruleset) :: t
   def attach(%Policy{} = policy, %{rules: rules}) do
@@ -512,15 +475,34 @@ defmodule Janus.Policy do
     end)
   end
 
-  @doc false
-  def rule_for(%{rules: rules}, action, schema) do
-    Map.get_lazy(rules, {schema, action}, fn ->
-      Rule.new(schema, action)
+  defp apply_rule(policy_or_ruleset, type, schema, actions, opts) when is_list(actions) do
+    Enum.reduce(actions, policy_or_ruleset, fn action, policy_or_ruleset ->
+      apply_rule(policy_or_ruleset, type, schema, action, opts)
     end)
+  end
+
+  defp apply_rule(policy_or_ruleset, type, schema, action, opts) do
+    validate_schema!(schema)
+
+    policy_or_ruleset
+    |> rule_for(action, schema)
+    |> Rule.apply_rule(type, opts)
+    |> put_rule(policy_or_ruleset)
   end
 
   defp put_rule(%Rule{schema: schema, action: action} = rule, policy_or_ruleset) do
     update_in(policy_or_ruleset.rules, &Map.put(&1, {schema, action}, rule))
+  end
+
+  defp validate_schema!(schema) when is_atom(schema) do
+    function_exported?(schema, :__schema__, 1) || invalid_schema!(schema)
+  end
+
+  defp validate_schema!(other), do: invalid_schema!(other)
+
+  defp invalid_schema!(invalid) do
+    raise ArgumentError,
+          "received invalid module #{inspect(invalid)}, expected a module defined using Ecto.Schema"
   end
 
   @doc """

@@ -25,23 +25,16 @@ defmodule Janus.Policy.Rule do
   end
 
   @doc false
-  def allow(rule, opts) do
+  def apply_rule(rule, :deny, []), do: Map.merge(rule, %{allow: [], deny: [[]]})
+
+  def apply_rule(rule, field, opts) do
     opts = parse_opts!(opts)
 
     if [] in rule.deny do
       rule
     else
-      Map.update(rule, :allow, [opts], &[opts | &1])
+      Map.update(rule, field, [opts], &[opts | &1])
     end
-  end
-
-  @doc false
-  def deny(rule, []), do: Map.merge(rule, %{allow: [], deny: [[]]})
-
-  def deny(rule, opts) do
-    opts = parse_opts!(opts)
-
-    Map.update(rule, :deny, [opts], &[opts | &1])
   end
 
   @doc false
@@ -49,8 +42,8 @@ defmodule Janus.Policy.Rule do
         %{schema: s, action: a} = rule,
         %{schema: s, action: a, allow: allow, deny: deny}
       ) do
-    rule = Enum.reduce(allow, rule, &allow(&2, &1))
-    rule = Enum.reduce(deny, rule, &deny(&2, &1))
+    rule = Enum.reduce(allow, rule, &apply_rule(&2, :allow, &1))
+    rule = Enum.reduce(deny, rule, &apply_rule(&2, :deny, &1))
     rule
   end
 
