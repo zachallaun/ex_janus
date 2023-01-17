@@ -4,63 +4,7 @@ defmodule <%= module %> do
 
   This module exposes a set of general-purpose authorization helpers as
   well as `Ecto.Repo` wrappers that can be used to enforce authorization
-  when data is loaded, inserted, updated, etc.
-
-  ## Policy structs
-
-  All of the functions in this module can accept either a policy struct
-  or a user, in which case a policy struct will be created for that user
-  under the hood. If it is desired to cache the policy struct to re-use
-  it for multiple calls, for instance in a `Plug.Conn` assign,
-  `build_policy/1` can be used:
-
-      iex> <%= module %>.build_policy(user)
-      %Janus.Policy{}
-
-  In the examples that follow, a policy can take the place of a user
-  anywhere one is passed as an argument.
-
-  ## Authorization helpers
-
-  The following functions can be used to authorize actions on resources:
-
-    * `authorize/4` - authorize a specific action on an already-loaded
-      resource
-    * `any_authorized?/3` - check whether the user has any access to
-      resources in the given query or schema
-    * `scope/4` - produce an `Ecto.Query` that filters results to those
-      authorized for the given action/user
-
-  See `Janus.Authorization` for more documentation on the above.
-
-  ## Authorized Repo operations
-
-  This module additionally defines various `authorized_*` functions that
-  provide authorizing alternatives to `Repo` functions. They include:
-
-    * `authorized_fetch_by/3`
-    * `authorized_fetch_all/2`
-    * `authorized_insert/2`
-    * `authorized_update/2`
-    * `authorized_delete/2`
-
-  For instance, `Chronos.Policy.authorized_update/2` can be used in
-  place of `Repo.update/2` to ensure that the given user is authorized
-  to make that update.
-
-  All of these functions accept accept an `:authorize` option containing
-  an `{action, user}` or `{action, policy}` tuplet. For example:
-
-      <%= module %>.authorized_fetch_by(Post, [id: id],
-        authorize: {:read, current_user}
-      )
-
-  To skip authorization checks, `authorize: false` can be passed in. For
-  example, the following would never return `{:error, :not_authorized}`:
-
-      <%= module %>.authorized_fetch_by(Post, [id: id],
-        authorize: false
-      )
+  for common CRUD operations.
   """
 
   use Janus, repo: <%= app %>.Repo
@@ -74,40 +18,21 @@ defmodule <%= module %> do
   end
 
   @doc """
-  Fetches a single result from the query, ensuring it is authorized.
-
-  Results in:
-
-    * `{:ok, result}` if the result is found and authorized
-    * `{:error, :not_authorized}` if the result is found and not
-      authorized
-    * `{:error, :not_found}` if the result is not found
-    * Raises if more than one entry
-
-  ## Options
-
-    * `:authorize` - An `{action, actor}` tuplet to authorize, or `false`
-      to skip authorization. See "Authorized Repo operations" for more.
-    * `:load_associations` - Whether to load associations if necessary
-      for authorization.
-    * Any option accepted by `c:Ecto.Repo.get_by/3`.
+  Fetch a single authorized result from a schema or query by key.
 
   ## Examples
 
-      auth = {:read, current_user}
-      result = authorized_fetch_by(Post, [title: "My post"], authorize: auth)
+      iex> authorized_fetch_by(Post, [id: 1], authorize: {:read, current_user})
+      {:ok, %Post{}}
 
-      case result do
-        {:ok, post}               -> # authorized and found
-        {:error, :not_authorized} -> # found but not authorized
-        {:error, :not_found}      -> # not found
-      end
+      iex> authorized_fetch_by(Post, [id: 0], authorize: {:read, current_user})
+      {:error, :not_found}
 
-      # additional opts passed to `Repo`
-      authorized_fetch_by(Post, [title: "My post"], authorize: auth, prefix: "public")
+      iex> authorized_fetch_by(Post, [id: 1], authorize: {:not_allowed_action, current_user})
+      {:error, :not_authorized}
 
-      # skip authorization check
-      authorized_fetch_by(Post, [title: "My post"], authorize: false)
+      iex> authorized_fetch_by(Post, [id: 1], authorize: false)
+      {:ok, %Post{}}
   """
   def authorized_fetch_by(queryable, clauses, opts \\ []) do
     {auth, auth_opts, repo_opts} = pop_authorize_opts!(opts, [:load_associations])
@@ -121,48 +46,22 @@ defmodule <%= module %> do
   end
 
   @doc """
-  Fetches all entries matching the given query that are authorized.
-
-  Results in:
-
-    * `{:ok, list_of_results}` if the query is authorized
-    * `{:error, :not_authorized}` if the query is not authorized
-
-  Note that `list_of_results` may be empty.
-
-  ## Options
-
-    * `:authorize` - An `{action, actor}` tuplet to authorize, or `false`
-      to skip authorization. See "Authorized Repo operations" for more.
-    * `:preload_authorized` - preload authorized entries into associations,
-      see `Janus.Authorization.scope/4` for more.
-    * Any option accepted by `c:Ecto.Repo.all/2`.
+  Fetch all authorized entries matching the given query.
 
   ## Examples
 
-      auth = {:read, current_user}
-      result = authorized_fetch_all(Post, authorize: auth)
+      iex> authorized_fetch_all(Post, authorize: {:read, current_user})
+      {:ok, [%Post{}, ...]}
 
-      case result do
-        {:ok, posts}              -> # query succeeded, authorized posts returned
-        {:error, :not_authorized} -> # not authorized to `:read` any Post
-      end
+      iex> from(Post, where: [title: "doesn't exist"])
+      ...> |> authorized_fetch_all(Post, authorize: {:read, current_user})
+      {:ok, []}
 
-      # further refine the result using a query
-      from(p in Post, where: p.inserted_at > ago(1, "day"))
-      |> authorized_fetch_all(authorize: auth)
+      iex> authorized_fetch_all(Post, authorize: {:not_allowed_action, current_user})
+      {:error, :not_authorized}
 
-      # preload authorized associations
-      from(p in Post, where: p.inserted_at > ago(1, "day"))
-      |> authorized_fetch_all(authorize: auth, preload_authorized: :author)
-
-      # preload nested authorized associations
-      from(p in Post, where: p.inserted_at > ago(1, "day"))
-      |> authorized_fetch_all(authorize: auth, preload_authorized: [author: :profile])
-
-      # skip authorization filter
-      from(p in Post, where: p.inserted_at > ago(1, "day"))
-      |> authorized_fetch_all(authorize: false)
+      iex> authorized_fetch_all(Post, authorize: false)
+      {:ok, [%Post{}, ...]}
   """
   def authorized_fetch_all(queryable, opts \\ []) do
     {auth, auth_opts, repo_opts} = pop_authorize_opts!(opts, [:preload_authorized])
@@ -177,33 +76,17 @@ defmodule <%= module %> do
   end
 
   @doc """
-  Deletes a struct (or changeset) using its primary key if the operation
-  is authorized.
+  Delete an entry by its primary key if authorized.
 
-  Results in:
-
-    * `{:ok, record}` if the authorized delete succeeded
-    * `{:error, changeset}` if the delete failed either due to an
-      authorization error or another validation
-
-  ## Options
-
-    * `:authorize` - An `{action, actor}` tuplet to authorize, or `false`
-      to skip authorization. See "Authorized Repo operations" for more.
-    * Any option accepted by `c:Ecto.Repo.delete/2`.
+  Accepts a struct or changeset.
 
   ## Examples
 
-      auth = {:delete, current_user}
-      {:ok, post} = authorized_fetch_by(Post, [title: "My post"], authorize: auth)
+      iex> authorized_delete(post, authorize: {:delete, current_user})
+      {:ok, post}
 
-      case authorized_delete(changeset, authorize: auth) do
-        {:ok, %Post{}}              -> # successfully deleted
-        {:error, %Ecto.Changeset{}} -> # something went wrong
-      end
-
-      # skip authorization check
-      authorized_delete(changeset, authorize: false)
+      iex> authorized_delete(unauthorized_post, authorize: {:delete, current_user})
+      {:error, %Ecto.Changeset{}}
   """
   def authorized_delete(struct_or_changeset, opts \\ [])
 
@@ -228,34 +111,19 @@ defmodule <%= module %> do
   end
 
   @doc """
-  Updates a changeset using its primary key if the operation is
-  authorized.
-
-  Results in:
-
-    * `{:ok, record}` if the underlying data was successfully updated
-    * `{:error, changeset}` if the update failed either due to an
-      authorization error or another validation
-
-  ## Options
-
-    * `:authorize` - An `{action, actor}` tuplet to authorize, or `false`
-      to skip authorization. See "Authorized Repo operations" for more.
-    * Any option accepted by `c:Ecto.Repo.update/2`.
+  Update a changeset by its primary key if authorized.
 
   ## Examples
 
-      auth = {:update, current_user}
-      {:ok, post} = authorized_fetch_by(Post, [title: "My post"], authorize: auth)
-      changeset = Ecto.Changeset.change(post, title: "My new title")
+      iex> post
+      ...> |> Post.changeset(%{title: "updated title"})
+      ...> |> authorized_update(authorize: {:update, current_user})
+      {:ok, %Post{title: "updated title"}}
 
-      case authorized_update(changeset, authorize: auth) do
-        {:ok, %Post{}}              -> # successfully updated
-        {:error, %Ecto.Changeset{}} -> # something went wrong
-      end
-
-      # skip authorization check
-      authorized_update(changeset, authorize: false)
+      iex> unauthorized_post
+      ...> |> Post.changeset(%{title: "updated title"})
+      ...> |> authorized_update(authorize: {:update, current_user})
+      {:error, %Ecto.Changeset{}}
   """
   def authorized_update(changeset, opts \\ []) do
     {auth, [], repo_opts} = pop_authorize_opts!(opts)
@@ -272,33 +140,15 @@ defmodule <%= module %> do
   end
 
   @doc """
-  Inserts a struct defined via `Ecto.Schema` or a changeset, ensuring
-  the resulting struct is authorized.
-
-  Results in:
-
-    * `{:ok, record}` if the data was successfully inserted
-    * `{:error, changeset}` if the insert failed either due to an
-      authorization error or another validation
-
-  ## Options
-
-    * `:authorize` - An `{action, actor}` tuplet to authorize, or `false`
-      to skip authorization. See "Authorized Repo operations" for more.
-    * Any option accepted by `c:Ecto.Repo.insert/2`.
+  Inserts a struct or changeset if authorized.
 
   ## Examples
 
-      auth = {:insert, current_user}
-      changeset = %Post{} |> Post.changeset(%{title: "My post"})
+      iex> authorized_insert(%Post{title: "new post"}, authorize: {:insert, current_user})
+      {:ok, %Post{title: "new post"}}
 
-      case authorized_insert(changeset, authorize: auth) do
-        {:ok, %Post{}}              -> # successfully inserted
-        {:error, %Ecto.Changeset{}} -> # something went wrong
-      end
-
-      # skip authorization check
-      authorized_insert(changeset, authorize: false)
+      iex> authorized_insert(%Post{archived: true}, authorize: {:insert, current_user})
+      {:error, %Ecto.Changeset{}}
   """
   def authorized_insert(struct_or_changeset, opts \\ [])
 
@@ -354,8 +204,7 @@ defmodule <%= module %> do
   end
 
   @doc """
-  Validates that the resource being changes is authorized for the given
-  action/user.
+  Validate that the resource and changes are authorized.
 
   ## Options
 
