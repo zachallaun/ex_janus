@@ -159,6 +159,12 @@ defmodule Janus.PolicyTest do
         |> deny(1, :read)
       end
     end
+
+    test "regression: should ensure schema is loaded before validating" do
+      :code.delete(Thread)
+      :code.purge(Thread)
+      assert %Janus.Policy{} = allow(%Janus.Policy{}, Thread, :read)
+    end
   end
 
   describe "allow/3 and deny/3" do

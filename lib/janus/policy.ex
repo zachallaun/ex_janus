@@ -495,7 +495,12 @@ defmodule Janus.Policy do
   end
 
   defp validate_schema!(schema) when is_atom(schema) do
-    function_exported?(schema, :__schema__, 1) || invalid_schema!(schema)
+    with {:module, _} <- Code.ensure_loaded(schema),
+         true <- function_exported?(schema, :__schema__, 1) do
+      :ok
+    else
+      _ -> invalid_schema!(schema)
+    end
   end
 
   defp validate_schema!(other), do: invalid_schema!(other)
