@@ -9,7 +9,7 @@ Janus can be installed by adding `ex_janus` to your deps in `mix.exs`:
 ```elixir
 defp deps do
   [
-    {:ex_janus, "~> 0.3.0"}
+    {:ex_janus, "~> 0.3.1"}
   ]
 end
 ```
