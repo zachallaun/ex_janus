@@ -8,6 +8,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
   * [Janus.Policy] Add rulesets: `Janus.Policy.attach/2`, `Janus.Policy.allow/3`, `Janus.Policy.deny/3`.
 
+### Fixes
+
+  * [Janus.Policy] Fix validation that was incorrectly raising when rules were defined for a schema module whose code hadn't yet been loaded.
+
 ## v0.3.0 (2023-01-16)
 
 ### Enhancements
