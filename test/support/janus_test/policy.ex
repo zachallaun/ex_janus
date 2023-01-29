@@ -1,5 +1,6 @@
 defmodule JanusTest.Policy do
-  use Janus, repo: JanusTest.Repo
+  use Janus.Authorization, policy: __MODULE__
+  use Janus.Policy, repo: JanusTest.Repo
 
   alias JanusTest.Schemas.Post
   alias JanusTest.Schemas.Thread

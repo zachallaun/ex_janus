@@ -1,6 +1,6 @@
 Code.require_file("../../mix_helper.exs", __DIR__)
 
-defmodule Mix.Tasks.Janus.Gen.PolicyTest do
+defmodule Mix.Tasks.Janus.Gen.AuthzTest do
   use Janus.DataCase
 
   import MixHelper
@@ -8,73 +8,61 @@ defmodule Mix.Tasks.Janus.Gen.PolicyTest do
   alias Mix.Tasks.Janus.Gen
 
   setup_all do
-    project = "janus.gen.policy_test"
+    project = "janus.gen.authz_test"
 
     tmp_dir =
       in_project(project, fn ->
-        Gen.Policy.run(~w(--module #{__MODULE__}.TestPolicy --app JanusTest --path lib/policy.ex))
+        Gen.Authz.run(~w(--app JanusTest))
       end)
 
     on_exit(fn -> File.rm_rf!(tmp_dir) end)
 
-    [{module, _}] =
-      [tmp_dir, project, "lib/policy.ex"]
-      |> Path.join()
-      |> Code.compile_file()
+    [[{policy, _}], [{authz, _}]] =
+      for file <- ["authz/policy.ex", "authz.ex"] do
+        [tmp_dir, project, "lib/janus_test", file]
+        |> Path.join()
+        |> Code.compile_file()
+      end
 
-    [module: module]
+    [authz_module: authz, policy_module: policy]
   end
 
-  describe "mix janus.gen.policy" do
+  describe "mix janus.gen.authz" do
     setup do
       Mix.Task.clear()
       :ok
     end
 
-    test "invalid arguments", config do
+    test "generates authz modules with defaults", config do
       in_tmp_project(config.test, fn ->
-        assert_raise Mix.Error, ~r/Module name `Janus.Policy` is already taken/, fn ->
-          Gen.Policy.run(~w(--module Janus.Policy))
-        end
-      end)
+        Gen.Authz.run(~w())
 
-      in_tmp_project(config.test, fn ->
-        message = "Module name `policy` is invalid. Expected an alias, e.g. `MyApp.Policy`"
+        assert_file("lib/ex_janus/authz.ex", fn file ->
+          assert file =~ "defmodule ExJanus.Authz do"
+          assert file =~ "use Janus.Authorization"
+        end)
 
-        assert_raise Mix.Error, message, fn ->
-          Gen.Policy.run(~w(--module policy))
-        end
-      end)
-    end
-
-    test "generates a policy module based on app name", config do
-      in_tmp_project(config.test, fn ->
-        Gen.Policy.run(~w())
-
-        assert_file("lib/ex_janus/policy.ex", fn file ->
-          assert file =~ "defmodule ExJanus.Policy do"
-          assert file =~ "alias ExJanus.Repo"
+        assert_file("lib/ex_janus/authz/policy.ex", fn file ->
+          assert file =~ "defmodule ExJanus.Authz.Policy do"
+          assert file =~ "use Janus.Policy"
         end)
       end)
     end
 
-    test "generates a policy module with the given name", config do
+    test "generates authz modules with given names", config do
       in_tmp_project(config.test, fn ->
-        Gen.Policy.run(~w(--module MyApp.Policy))
+        Gen.Authz.run(~w(--app MyApp --authz MyAuthz --policy MyPolicy))
 
-        assert_file("lib/ex_janus/policy.ex", fn file ->
-          assert file =~ "defmodule MyApp.Policy do"
-          assert file =~ "alias ExJanus.Repo"
+        assert_file("lib/my_app/my_authz.ex", fn file ->
+          assert file =~ "defmodule MyApp.MyAuthz do"
+          assert file =~ "use Janus.Authorization"
+          assert file =~ "policy: MyApp.MyAuthz.MyPolicy"
         end)
-      end)
-    end
 
-    test "generates a policy module at a custom path", config do
-      in_tmp_project(config.test, fn ->
-        Gen.Policy.run(~w(--module MyApp.Policy --path lib/myapp/policy.ex))
-
-        assert_file("lib/myapp/policy.ex")
-        refute_file("lib/ex_janus/policy.ex")
+        assert_file("lib/my_app/my_authz/my_policy.ex", fn file ->
+          assert file =~ "defmodule MyApp.MyAuthz.MyPolicy do"
+          assert file =~ "use Janus.Policy"
+        end)
       end)
     end
   end
@@ -94,7 +82,7 @@ defmodule Mix.Tasks.Janus.Gen.PolicyTest do
     end
 
     test "validate_authorized/4 shouldn't add error if change is authorized", %{
-      module: module,
+      authz_module: module,
       policy: policy,
       thread: thread
     } do
@@ -107,7 +95,7 @@ defmodule Mix.Tasks.Janus.Gen.PolicyTest do
     end
 
     test "validate_authorized/4 should add error if action not allowed by policy", %{
-      module: module,
+      authz_module: module,
       policy: policy,
       thread: thread
     } do
@@ -122,7 +110,7 @@ defmodule Mix.Tasks.Janus.Gen.PolicyTest do
     end
 
     test "validate_authorized/4 should accept custom :error_key", %{
-      module: module,
+      authz_module: module,
       policy: policy,
       thread: thread
     } do
@@ -135,7 +123,7 @@ defmodule Mix.Tasks.Janus.Gen.PolicyTest do
     end
 
     test "validate_authorized/4 should accept custom :message", %{
-      module: module,
+      authz_module: module,
       policy: policy,
       thread: thread
     } do
@@ -147,7 +135,7 @@ defmodule Mix.Tasks.Janus.Gen.PolicyTest do
       assert [current_user: {"custom message", _}] = denied.errors
     end
 
-    test "authorized_fetch_by/3", %{module: module, policy: policy, thread: thread} do
+    test "authorized_fetch_by/3", %{authz_module: module, policy: policy, thread: thread} do
       opts = [authorize: {:update, policy}]
       %{id: id} = thread
       %{id: t2_id} = thread_fixture()
@@ -162,7 +150,7 @@ defmodule Mix.Tasks.Janus.Gen.PolicyTest do
       assert {:error, :not_found} = module.authorized_fetch_by(Thread, [id: 0], opts)
     end
 
-    test "authorized_fetch_all/3", %{module: module, policy: policy, thread: thread} do
+    test "authorized_fetch_all/3", %{authz_module: module, policy: policy, thread: thread} do
       opts = [authorize: {:update, policy}]
       %{id: id} = thread
       _ = thread_fixture()
@@ -174,7 +162,7 @@ defmodule Mix.Tasks.Janus.Gen.PolicyTest do
                module.authorized_fetch_all(Thread, opts ++ [preload_authorized: :posts])
     end
 
-    test "authorized_insert/3", %{module: module, policy: policy, user: user} do
+    test "authorized_insert/3", %{authz_module: module, policy: policy, user: user} do
       opts = [authorize: {:insert, policy}]
 
       assert {:ok, %Thread{}} =
@@ -192,7 +180,7 @@ defmodule Mix.Tasks.Janus.Gen.PolicyTest do
       assert [current_user: {"is not authorized to make these changes", []}] = errors
     end
 
-    test "authorized_update/3", %{module: module, policy: policy, thread: thread} do
+    test "authorized_update/3", %{authz_module: module, policy: policy, thread: thread} do
       opts = [authorize: {:update, policy}]
       thread2 = thread_fixture()
 
@@ -205,7 +193,7 @@ defmodule Mix.Tasks.Janus.Gen.PolicyTest do
       assert [current_user: {"is not authorized to change this resource", []}] = errors
     end
 
-    test "authorized_delete/3", %{module: module, policy: policy, thread: thread} do
+    test "authorized_delete/3", %{authz_module: module, policy: policy, thread: thread} do
       opts = [authorize: {:delete, policy}]
       thread2 = thread_fixture()
 

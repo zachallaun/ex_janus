@@ -1,9 +1,8 @@
-defmodule Mix.Tasks.Janus.Gen.Policy do
-  @shortdoc "Generates a basic policy module"
+defmodule Mix.Tasks.Janus.Gen.Authz do
   @moduledoc """
-  Creates a basic policy module.
+  Creates an Authorization and Policy module.
 
-      $ mix janus.gen.policy [--module MODULE] [--path PATH]
+      $ mix janus.gen.authz
 
   Creates the following file:
 
@@ -13,22 +12,29 @@ defmodule Mix.Tasks.Janus.Gen.Policy do
 
   ## Options
 
-    * `--module` - The name of the generated module, defaults to
-      `AppName.Policy`
-    * `--app` - The name of the application namespace, defaults to your
-      application name camelized, e.g. `AppName`
-    * `--path` - The path (including filename) for the generated module,
-      defaults to `lib/app_name/policy.ex`
+    * `--authz` - The name of the generated Authorization module.
+      Defaults to `Authz`.
+    * `--policy` - The name of the generated Policy module. Defaults to
+      `Policy`.
+    * `--app` - The name of the app (camelized, e.g. `MyApp`). Defaults
+      to the camelized variant of your OTP app name.
   """
 
   use Mix.Task
 
   @doc false
   def run(args) do
-    opts = parse_args(args)
+    parsed = parse_args(args)
+
+    opts = [
+      app: parsed[:app],
+      authz_module: authz_module(parsed),
+      policy_module: policy_module(parsed)
+    ]
 
     copy_from("priv/templates", opts, [
-      {"policy.ex.eex", opts[:path]}
+      {"authz.ex.eex", dest(opts[:authz_module])},
+      {"policy.ex.eex", dest(opts[:policy_module])}
     ])
   end
 
@@ -40,26 +46,27 @@ defmodule Mix.Tasks.Janus.Gen.Policy do
   end
 
   defp parse_args(args) do
-    options = [module: :string, path: :string, app: :string]
+    options = [authz: :string, policy: :string, app: :string]
     {opts, []} = OptionParser.parse!(args, strict: options)
 
     opts
-    |> Keyword.put_new_lazy(:module, &default_module/0)
-    |> Keyword.update!(:module, &module_for_template!/1)
-    |> Keyword.put_new_lazy(:path, &default_path/0)
     |> Keyword.put_new_lazy(:app, &app_namespace/0)
+    |> Keyword.put_new(:authz, "Authz")
+    |> Keyword.put_new(:policy, "Policy")
   end
 
-  defp default_path do
-    "lib/#{otp_app()}/policy.ex"
+  defp dest(module_name) do
+    "lib/" <> Macro.underscore(module_name) <> ".ex"
   end
 
-  defp default_module do
-    Module.concat(app_namespace(), Policy)
+  defp authz_module(args) do
+    "#{args[:app]}.#{args[:authz]}"
+    |> parse_module!()
+    |> display_name()
   end
 
-  defp module_for_template!(module) do
-    module
+  defp policy_module(args) do
+    "#{args[:app]}.#{args[:authz]}.#{args[:policy]}"
     |> parse_module!()
     |> display_name()
   end
@@ -95,7 +102,7 @@ defmodule Mix.Tasks.Janus.Gen.Policy do
   defp ensure_alias!(module) do
     unless Macro.classify_atom(module) == :alias do
       Mix.raise(
-        "Module name `#{display_name(module)}` is invalid. Expected an alias, e.g. `MyApp.Policy`"
+        "Module name `#{display_name(module)}` is invalid. Expected an alias, e.g. `Policy`"
       )
     end
 

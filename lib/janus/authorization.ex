@@ -27,6 +27,8 @@ defmodule Janus.Authorization do
 
   @type filterable :: Janus.schema_module() | Ecto.Query.t()
 
+  @callback policy_for(Janus.actor() | Policy.t()) :: Policy.t()
+
   @callback authorize(Ecto.Schema.t(), Janus.action(), Janus.actor() | Policy.t(), keyword()) ::
               {:ok, Ecto.Schema.t()} | {:error, :not_authorized}
 
@@ -35,6 +37,57 @@ defmodule Janus.Authorization do
 
   @callback scope(filterable, Janus.action(), Janus.actor() | Policy.t(), keyword()) ::
               Ecto.Query.t()
+
+  @doc """
+  Defines an authorization module.
+
+  An authorization module exposes an API used by the rest of your
+  application to ensure that all actions (reads, updates, etc.) are
+  authorized for the current actor.
+
+  `use Janus.Authorization` injects default
+
+  ## Options
+
+    * `:policy` (required) - The policy module implementing the
+      `Janus.Policy` behaviour that defines authorization rules for
+      actors in the application.
+
+    * `:load_associations` - Load associations when required by your
+      authorization rules (requires `:repo` config option to be set or
+      to be passed explicitly at the call site). Defaults to `false`.
+
+    * `:repo` - `Ecto.Repo` used to load associations when required by
+      your authorization rules. Defaults to `nil`.
+  """
+  defmacro __using__(opts \\ []) do
+    policy_module = Keyword.fetch!(opts, :policy)
+
+    quote location: :keep do
+      @behaviour Janus.Authorization
+
+      @impl Janus.Authorization
+      def policy_for(%Janus.Policy{} = policy), do: policy
+      def policy_for(actor), do: unquote(policy_module).build_policy(actor)
+
+      @impl Janus.Authorization
+      def authorize(resource, action, actor, opts \\ []) do
+        Janus.Authorization.authorize(resource, action, policy_for(actor), opts)
+      end
+
+      @impl Janus.Authorization
+      def any_authorized?(schema, action, actor) do
+        Janus.Authorization.any_authorized?(schema, action, policy_for(actor))
+      end
+
+      @impl Janus.Authorization
+      def scope(query_or_schema, action, actor, opts \\ []) do
+        Janus.Authorization.scope(query_or_schema, action, policy_for(actor), opts)
+      end
+
+      defoverridable authorize: 4, any_authorized?: 3, scope: 4
+    end
+  end
 
   @doc """
   Checks whether any permissions are defined for the given schema,

@@ -7,7 +7,8 @@ defmodule JanusTest do
 
   describe "policy modules" do
     defmodule ExamplePolicy do
-      use Janus
+      use Janus.Policy
+      use Janus.Authorization, policy: __MODULE__
 
       @impl true
       def build_policy(policy, _) do
@@ -87,7 +88,7 @@ defmodule JanusTest do
       [{module, _}] =
         quote do
           defmodule AllConfigOptions do
-            use Janus,
+            use Janus.Policy,
               repo: Example.Repo,
               load_associations: true
 
@@ -106,7 +107,7 @@ defmodule JanusTest do
       [{module, _}] =
         quote do
           defmodule InvalidOptions do
-            use Janus, not_valid: true
+            use Janus.Policy, not_valid: true
 
             @impl true
             def build_policy(policy, _actor), do: policy

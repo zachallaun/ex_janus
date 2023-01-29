@@ -223,74 +223,7 @@ defmodule Janus do
       introspection capabilities.
   """
 
-  require Ecto.Query
-
   @type action :: any()
   @type schema_module :: module()
   @type actor :: any()
-
-  @doc """
-  Sets up a module to implement the `Janus.Policy` and
-  `Janus.Authorization` behaviours.
-
-  Using `use Janus` does the following:
-
-    * adds the `Janus.Policy` behaviour, imports functions used to
-      define the required callback `c:Janus.Policy.build_policy/2`, and
-      defines a `build_policy/1` helper
-
-    * adds the `Janus.Authorization` behaviour and injects default
-      (overridable) implementations for all callbacks
-
-  ## Options
-
-    * `:load_associations` - Load associations when required by your
-      authorization rules (requires `:repo` config option to be set or
-      to be passed explicitly at the call site), defaults to `false`
-
-    * `:repo` - `Ecto.Repo` used to load associations when required by
-      your authorization rules
-
-  See "Configuration" section for details.
-
-  ## Example
-
-      defmodule MyApp.Policy do
-        use Janus, repo: MyApp.Repo
-
-        @impl true
-        def build_policy(policy, _actor) do
-          policy
-          # |> allow(...)
-        end
-      end
-  """
-  defmacro __using__(opts \\ []) do
-    quote location: :keep do
-      @behaviour Janus.Authorization
-
-      use Janus.Policy, unquote(opts)
-      require Janus
-
-      @impl Janus.Authorization
-      def authorize(resource, action, actor, opts \\ []) do
-        Janus.Authorization.authorize(resource, action, __policy_for__(actor), opts)
-      end
-
-      @impl Janus.Authorization
-      def any_authorized?(schema, action, actor) do
-        Janus.Authorization.any_authorized?(schema, action, __policy_for__(actor))
-      end
-
-      @impl Janus.Authorization
-      def scope(query_or_schema, action, actor, opts \\ []) do
-        Janus.Authorization.scope(query_or_schema, action, __policy_for__(actor), opts)
-      end
-
-      defoverridable authorize: 4, any_authorized?: 3, scope: 4
-
-      defp __policy_for__(%Janus.Policy{} = policy), do: policy
-      defp __policy_for__(actor), do: build_policy(actor)
-    end
-  end
 end

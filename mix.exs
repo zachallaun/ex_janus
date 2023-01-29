@@ -4,7 +4,7 @@ defmodule Janus.MixProject do
   @app :ex_janus
   @source_url "https://github.com/zachallaun/ex_janus"
 
-  def version, do: "0.3.2"
+  def version, do: "0.4.0-dev"
 
   def project do
     [
