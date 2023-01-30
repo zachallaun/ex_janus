@@ -4,11 +4,12 @@ defmodule Mix.Tasks.Janus.Gen.Authz do
 
       $ mix janus.gen.authz
 
-  Creates the following file:
+  Creates the following files:
 
-    * `lib/app_name/policy.ex` - A Janus policy module containing
-      additional authorization helpers (see [Generated Policy Modules](generated_policy_modules.html)
-      for more info)
+    * `lib/app_name/authz.ex` - Authorization API used by the rest
+      of your application to load and authorize resources.
+    * `lib/app_name/authz/policy.ex` - Policy definition containing
+      authorization rules.
 
   ## Options
 
