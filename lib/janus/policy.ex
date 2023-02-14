@@ -315,6 +315,7 @@ defmodule Janus.Policy do
   end
 
   @doc false
+  @spec allow(t, Janus.schema_module(), Janus.action() | [Janus.action()]) :: t
   def allow(%Policy{} = policy, schema, action) do
     allow(policy, schema, action, [])
   end

@@ -71,6 +71,7 @@ defmodule Janus.MixProject do
       :t,
       :setup,
       :coveralls,
+      :dialyzer,
       :"coveralls.detail",
       :"coveralls.post",
       :"coveralls.html",
@@ -121,7 +122,7 @@ defmodule Janus.MixProject do
   defp dialyzer do
     [
       plt_file: {:no_warn, "priv/plts/dialyzer.plt"},
-      plt_add_apps: [:mix],
+      plt_add_apps: [:mix, :ex_unit, :ecto],
       flags: [
         :underspecs,
         :extra_return,
