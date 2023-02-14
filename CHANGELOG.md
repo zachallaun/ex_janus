@@ -2,6 +2,12 @@
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.3.2 (2023-02-14)
+
+### Fixes
+
+  * [Janus.Policy] Add missing `@spec` for `allow/3` that was causing errors when running Dialyzer.
+
 ## v0.3.1 (2023-01-17)
 
 ### Enhancements
