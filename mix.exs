@@ -102,16 +102,16 @@ defmodule Janus.MixProject do
       extras: [
         "CHANGELOG.md",
         "cheatsheets/basics.cheatmd",
-        "cheatsheets/policy_usage.cheatmd",
-        "guides/generated_policy_modules.md"
+        "cheatsheets/authorization.cheatmd",
+        "guides/generated_modules.md"
       ],
       groups_for_extras: [
         Cheatsheets: [
           "cheatsheets/basics.cheatmd",
-          "cheatsheets/policy_usage.cheatmd"
+          "cheatsheets/authorization.cheatmd"
         ],
         Guides: [
-          "guides/generated_policy_modules.md"
+          "guides/generated_modules.md"
         ]
       ],
       groups_for_modules: [

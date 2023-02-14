@@ -1,11 +1,11 @@
-# Policy Usage
+# Authorization cheatsheet
 
 ## Authorization
 {: .col-2}
 
-### Using policies in a context module
+### Usage in a context module
 
-Policies should most often be used in context modules, since they provide the interface to actions and resources that the rest of your application uses.
+Authorization modules should most often be used in context modules.
 
 ```elixir
 defmodule MyApp.MessageBoard do
@@ -15,7 +15,7 @@ defmodule MyApp.MessageBoard do
   import Ecto.Query
 
   # imports authorize, any_authorized?, scope, etc.
-  import MyApp.Policy
+  import MyApp.Authz
 
   alias MyApp.Repo
 
@@ -110,20 +110,20 @@ scope(Post, :read, user_or_policy,
 ## Caching a policy
 {: .col-2}
 
-### Call `build_policy/1` to get the policy for a user
+### Call `policy_for/1` to get the policy for a user
 
 ```elixir
-iex> policy = MyApp.Policy.build_policy(current_user)
+iex> policy = MyApp.Authz.policy_for(current_user)
 %Janus.Policy{...}
 ```
 
 ### Pass a policy anywhere you'd pass in an actor
 
 ```elixir
-iex> MyApp.Policy.authorize(post, :read, policy)
+iex> MyApp.Authz.authorize(post, :read, policy)
 {:ok, post}
 
-iex> MyApp.Policy.scope(Post, :read, policy)
+iex> MyApp.Authz.scope(Post, :read, policy)
 %Ecto.Query{}
 ```
 
@@ -136,7 +136,7 @@ def assign_current_policy(conn) do
   %{assigns: %{current_user: user}} = conn
 
   conn
-  |> assign(:current_policy, MyApp.Policy.build_policy(user))
+  |> assign(:current_policy, MyApp.Authz.policy_for(user))
 end
 ```
 

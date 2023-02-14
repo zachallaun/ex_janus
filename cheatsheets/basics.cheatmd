@@ -6,23 +6,23 @@
 ### Generator
 
 ```sh
-$ mix janus.gen.policy
-* creating lib/my_app/policy.ex
+$ mix janus.gen.authz
+* creating lib/my_app/authz.ex
+* creating lib/my_app/authz/policy.ex
 ```
 
-Generate a starting policy module for your application.
-For more information, see the [Generated Policy Modules](generated_policy_modules.html) guide.
+Generates an authorization and policy module for your application.
+For more information, see the [Generated Modules](generated_modules.html) guide.
 
 ### Policy module
 
-Your policy module is the interface used by the rest of your application.
-This is usually the only place you should be referring to `Janus` directly.
+Your policy module defines authorization rules using the functions in `Janus.Policy`.
 
-#### lib/my_app/policy.ex
+#### lib/my_app/authz/policy.ex
 
 ```elixir
-defmodule MyApp.Policy do
-  use Janus
+defmodule MyApp.Authz.Policy do
+  use Janus.Policy
 
   @impl true
   def build_policy(policy, actor) do
@@ -32,7 +32,15 @@ defmodule MyApp.Policy do
 end
 ```
 
-For more information on defining policies, see the [Policy Definition Cheatsheet](policy_definition.html)
+### Authorization module
+
+Your authorization module "consumes" your policy module and exposes the API that the rest of your application uses.
+
+```elixir
+defmodule MyApp.Authz do
+  use Janus.Authorization, policy: MyApp.Authz.Policy
+end
+```
 
 ## Core concepts
 {: .col-2}
@@ -52,15 +60,15 @@ policy
 #### Used when scoping a query
 
 ```elixir
-MyApp.Policy.scope(Post, :edit, current_user)
-#                  ^^^^
+MyApp.Authz.scope(Post, :edit, current_user)
+#                 ^^^^
 ```
 
 #### Used when checking for permissions
 
 ```elixir
-MyApp.Policy.any_authorized?(Post, :edit, current_user)
-#                            ^^^^
+MyApp.Authz.any_authorized?(Post, :edit, current_user)
+#                           ^^^^
 ```
 
 ### Resources
@@ -70,8 +78,8 @@ Resources are loaded structs defined by one of your schemas.
 #### Used when authorizing an action
 
 ```elixir
-MyApp.Policy.authorize(%Post{}, :edit, current_user)
-#                      ^^^^^^^
+MyApp.Authz.authorize(%Post{}, :edit, current_user)
+#                     ^^^^^^^
 ```
 
 ### Actors
@@ -92,11 +100,11 @@ end
 #### Used when calling any authorization function
 
 ```elixir
-MyApp.Policy.authorize(%Post{}, :edit, current_user)
-#                                      ^^^^^^^^^^^^
+MyApp.Authz.authorize(%Post{}, :edit, current_user)
+#                                     ^^^^^^^^^^^^
 
-MyApp.Policy.scope(Post, :edit, current_user)
-#                               ^^^^^^^^^^^^
+MyApp.Authz.scope(Post, :edit, current_user)
+#                              ^^^^^^^^^^^^
 ```
 
 ### Actions
@@ -115,8 +123,8 @@ policy
 #### Used when calling any authorization function
 
 ```elixir
-MyApp.Policy.authorize(%Post{}, :edit, current_user)
-#                               ^^^^^
+MyApp.Authz.authorize(%Post{}, :edit, current_user)
+#                              ^^^^^
 ```
 
 #### Can be any term except a list

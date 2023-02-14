@@ -1,4 +1,4 @@
-# Generated Policy Modules
+# Generated Modules
 
 > #### Work in progress {: .warning}
 >
@@ -9,15 +9,15 @@ To support common conventions, like the use of Phoenix-style context modules, Ja
 
 The goal of this guide is to explain the usage of, and reasoning behind, those helpers.
 
-## Generating a policy module
+## Generating an authorization and policy module
 
-The policy generator creates a policy module containing authorization functions that can be used by the rest of your application.
-
-```sh
-$ mix janus.gen.policy [--module Example.Policy] [--path example/path/policy.ex]
+```bash
+$ mix janus.gen.authz
+* creating lib/my_app/authz.ex
+* creating lib/my_app/authz/policy.ex
 ```
 
-When run without arguments, it will generate a policy module called `YourApp.Policy` at `lib/your_app/policy.ex` (with `YourApp` replaced by your actual application namespace).
+The generated policy module is extremely minimal, but the `MyApp.Authz` module contains a number of helpers.
 
 ## Overview of helpers
 
@@ -59,7 +59,7 @@ Let's look at some examples.
 iex> Repo.get_by(Post, id: 12345)
 %Post{}
 
-iex> Policy.authorized_fetch_by(Post, [id: 12345], authorize: {:read, user})
+iex> MyApp.Authz.authorized_fetch_by(Post, [id: 12345], authorize: {:read, user})
 {:ok, %Post{}}
 # or
 {:error, :not_authorized}
@@ -80,7 +80,7 @@ A similar approach is used in the next example:
 iex> Repo.all(Post)
 [%Post{}, ...]
 
-iex> Policy.authorized_fetch_all(Post, authorize: {:read, user})
+iex> MyApp.Authz.authorized_fetch_all(Post, authorize: {:read, user})
 {:ok, [%Post{}, ...]}
 # or
 {:error, :not_authorized}
@@ -96,7 +96,7 @@ iex> query = from p in Post, where: p.inserted_at > ago(1, "month")
 iex> Repo.all(query)
 [%Post{}, ...]
 
-iex> Policy.authorized_fetch_all(query, authorize: {:read, user})
+iex> MyApp.Authz.authorized_fetch_all(query, authorize: {:read, user})
 {:ok, [%Post{}, ...]}
 # or
 {:error, :not_authorized}

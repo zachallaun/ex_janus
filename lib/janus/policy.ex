@@ -6,16 +6,15 @@ defmodule Janus.Policy do
   defines the schemas that actor can access, the actions they can take,
   and any restrictions to the set of resources that can be accessed.
   These policies are generally created implicitly for actors passed to
-  functions defined by `Janus.Authorization`, but they can also be
-  created with `c:build_policy/2`.
+  functions defined by `Janus.Authorization`.
 
-  ## Creating a policy modules
+  ## Creating a policy module
 
-  While you can create a policy module with `use Janus.Policy`, you will
-  usually invoke `use Janus` and implement `c:build_policy/2`:
+  Policy modules `use Janus.Policy` and implement the required callback
+  `c:build_policy/2`:
 
-      defmodule MyApp.Policy do
-        use Janus
+      defmodule MyApp.Authz.Policy do
+        use Janus.Policy
 
         @impl true
         def build_policy(policy, _actor) do
@@ -26,15 +25,10 @@ defmodule Janus.Policy do
   An implementation for `c:build_policy/1` is injected into the policy
   module.
 
-  Policy modules can now be used to generate policy structs explicitly
-  (though they will usually be created implicitly when calling functions
-  defined by `Janus.Authorization`).
-
-      iex> policy = MyApp.Policy.build_policy(:my_user)
-      %Janus.Policy{actor: :my_user, rules: %{...}}
-
-      iex> MyApp.SecondaryPolicy.build_policy(policy)
-      %Janus.Policy{actor: :my_user, rules: %{...}}
+  The policy above is not very useful (it doesn't allow anyone to do
+  anything) but that can be changed by using the `Janus.Policy` API to
+  define actions, resources, and conditions that make up your
+  authorization rules.
 
   ## Permissions with `allow` and `deny`
 
@@ -194,6 +188,30 @@ defmodule Janus.Policy do
 
   Functions can be registered as hooks that run prior to authorization
   calls. See `attach_hook/4` for more information.
+
+  ## Configuration
+
+  Some defaults can be configured by passing them as options when
+  invoking `use Janus.Policy`. Those are:
+
+    * `:repo` - the `Ecto.Repo` used to load associations when required
+      by your authorization rules. Defaults to `nil`.
+
+    * `:load_associations` - whether to load associations when required
+      by your authorization rules. Defaults to `false`.
+
+  For example:
+
+      defmodule MyApp.Authz.Policy do
+          use Janus.Policy,
+            repo: MyApp.Repo,
+            load_associations: true
+
+          # ...
+      end
+
+  Authorization modules that use this policy will now use these options
+  by default.
   """
 
   alias __MODULE__
@@ -235,7 +253,7 @@ defmodule Janus.Policy do
   policy associated with that actor and passes it to `c:build_policy/2`.
 
   An implementation for this callback is injected into modules invoking
-  either `use Janus` or `use Janus.Policy`.
+  `use Janus.Policy`.
   """
   @callback build_policy(t | Janus.actor()) :: t
 
