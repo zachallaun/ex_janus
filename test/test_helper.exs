@@ -5,3 +5,4 @@ Ecto.Adapters.SQL.Sandbox.mode(JanusTest.Repo, :manual)
 Mix.shell(Mix.Shell.Process)
 
 ExUnit.start()
+Mneme.start()

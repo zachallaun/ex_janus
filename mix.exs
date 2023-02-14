@@ -48,7 +48,8 @@ defmodule Janus.MixProject do
       {:ecto_sql, "~> 3.9", only: [:dev, :test]},
       {:jason, "~> 1.4", only: [:dev, :test]},
       {:postgrex, "~> 0.16", only: :test},
-      {:patch, "~> 0.12.0", only: :test}
+      {:patch, "~> 0.12.0", only: :test},
+      {:mneme, "~> 0.0.4", only: :test}
     ]
   end
 
