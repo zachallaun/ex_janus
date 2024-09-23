@@ -42,13 +42,13 @@ defmodule Janus.MixProject do
       {:ecto, "~> 3.9"},
 
       # dev/test
-      {:ex_doc, "0.29.1", only: :dev, runtime: false},
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:excoveralls, "~> 0.15", only: :test},
       {:dialyxir, "~> 1.2", only: [:dev, :test], runtime: false},
       {:ecto_sql, "~> 3.9", only: [:dev, :test]},
       {:jason, "~> 1.4", only: [:dev, :test]},
       {:postgrex, "~> 0.16", only: :test},
-      {:patch, "~> 0.12.0", only: :test}
+      {:patch, "~> 0.13.0", only: :test}
     ]
   end
 
