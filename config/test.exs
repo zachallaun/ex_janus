@@ -9,4 +9,4 @@ config :ex_janus, JanusTest.Repo,
   hostname: "localhost",
   pool: Ecto.Adapters.SQL.Sandbox
 
-config :logger, level: :warn
+config :logger, level: :warning

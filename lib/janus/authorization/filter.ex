@@ -14,7 +14,7 @@ defmodule Janus.Authorization.Filter do
           action: Janus.action(),
           schema: Janus.schema_module(),
           binding: atom(),
-          dynamic: Ecto.Query.dynamic(),
+          dynamic: Ecto.Query.dynamic_expr(),
           joins: keyword()
         }
 
@@ -128,6 +128,12 @@ defmodule Janus.Authorization.Filter do
     end
   end
 
+  # Ecto >= 3.12
+  defp dump({:parameterized, {type, params}}, value) do
+    type.dump(value, nil, params)
+  end
+
+  # Ecto < 3.12
   defp dump({:parameterized, type, params}, value) do
     type.dump(value, nil, params)
   end
@@ -191,9 +197,10 @@ defmodule Janus.Authorization.Filter do
 
       from([{^preload.owner_as, r}] in query,
         left_lateral_join: lateral in subquery(lateral_query),
+        on: true,
         left_join: a in assoc(r, ^preload.assoc),
-        as: ^preload.related_as,
-        on: a.id == lateral.id
+        on: a.id == lateral.id,
+        as: ^preload.related_as
       )
     end)
     |> from(preload: ^preload_opt)
