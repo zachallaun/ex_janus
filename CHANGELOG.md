@@ -2,6 +2,12 @@
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.3.3 (2024-09-25)
+
+### Fixes
+
+  * Support Ecto 3.12+.
+
 ## v0.3.2 (2023-02-14)
 
 ### Fixes
